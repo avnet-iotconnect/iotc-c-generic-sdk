@@ -18,13 +18,9 @@ extern "C" {
 
 
 typedef enum {
-    // Any device keys are publicly available to anyone who can discover your CPID
-    // at https://<your api host>.iotconnect.io/api/2.0/agent/sync?
-    // Key based authentication is only recommended for quick testing and should NEVER be used in production
-    // as it does not offer the same level af security as IoTHub
-    IOTC_KEY,
-
-    IOTC_X509
+    IOTC_AT_KEY = 1,
+    IOTC_AT_X509 = 2,
+    IOTC_AT_TPM = 4 // 4 for compatibility with sync
 } IotConnectAuthType;
 
 typedef enum {
@@ -44,6 +40,7 @@ typedef struct {
             char* device_key; // Path to a file containing the device private key in PEM format
         } cert_info;
         char *symmetric_key;
+        char *scope_id; // for TPM authentication. AKA: ID Scope
     } data;
 } IotConnectAuthInfo;
 

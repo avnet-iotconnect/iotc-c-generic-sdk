@@ -167,9 +167,16 @@ static IotclSyncResponse *run_http_sync(const char *cpid, const char *uniqueid) 
 
     ret = iotcl_discovery_parse_sync_response(json_start);
     if (!ret || ret->ds != IOTCL_SR_OK) {
-        report_sync_error(ret, response.data);
-        iotcl_discovery_free_sync_response(ret);
-        ret = NULL;
+        if (config.auth_info.type == IOTC_AT_TPM && ret && ret->ds == IOTCL_SR_DEVICE_NOT_REGISTERED) {
+            // malloc below will be freed when we iotcl_discovery_free_sync_response
+            ret->broker.client_id = malloc(strlen(uniqueid) + 1 /* - */ + strlen(cpid) + 1);
+            sprintf(ret->broker.client_id, "%s-%s", cpid, uniqueid);
+            printf("TPM Device is not yet enrolled. Enrolling...\n");
+        } else {
+            report_sync_error(ret, response.data);
+            iotcl_discovery_free_sync_response(ret);
+            ret = NULL;
+        }
     }
 
     cleanup:
@@ -286,13 +293,13 @@ int iotconnect_sdk_init() {
     lib_config.telemetry.dtg = sync_response->dtg;
 
     char cpid_buff[5];
-    strncpy(cpid_buff, sync_response->cpid, 4);
+    strncpy(cpid_buff, config.cpid, 4);
     cpid_buff[4] = 0;
     printf("CPID: %s***\n", cpid_buff);
     printf("ENV:  %s\n", config.env);
 
 
-    if (config.auth_info.type != IOTC_X509 && config.auth_info.type != IOTC_KEY) {
+    if (config.auth_info.type != IOTC_AT_X509 && config.auth_info.type != IOTC_AT_KEY  && config.auth_info.type != IOTC_AT_TPM) {
         fprintf(stderr, "Error: Unsupported authentication type!\n");
         return -1;
     }
@@ -301,7 +308,7 @@ int iotconnect_sdk_init() {
         fprintf(stderr, "Error: Configuration server certificate is required.\n");
         return -1;
     }
-    if (config.auth_info.type == IOTC_X509 && (
+    if (config.auth_info.type == IOTC_AT_X509 && (
             !config.auth_info.data.cert_info.device_cert ||
             !config.auth_info.data.cert_info.device_key)) {
         fprintf(stderr, "Error: Configuration authentication info is invalid.\n");
@@ -309,7 +316,7 @@ int iotconnect_sdk_init() {
     }
 
 #ifdef IOTC_USE_PAHO
-    if (config.auth_info.type == IOTC_KEY) {
+    if (config.auth_info.type == IOTC_AT_KEY) {
         if (config.auth_info.data.symmetric_key && strlen(config.auth_info.data.symmetric_key) > 0) {
             char *sas_token = gen_sas_token(sync_response->broker.host,
                                                   config.cpid,
@@ -337,6 +344,19 @@ int iotconnect_sdk_init() {
     if (ret) {
         fprintf(stderr, "Failed to connect!\n");
         return ret;
+    }
+
+    // Workaround: upon first time TPM registration, the information returned from sync will be partial,
+    // so update dtg with new sync call
+    if (config.auth_info.type == IOTC_AT_TPM && sync_response->ds == IOTCL_SR_DEVICE_NOT_REGISTERED) {
+        iotcl_discovery_free_sync_response(sync_response);
+        lib_config.telemetry.dtg = sync_response->dtg;
+        sync_response = run_http_sync(config.cpid, config.duid);
+        if (NULL == sync_response) {
+            // Sync_call will print the error
+            return -2;
+        }
+        printf("Secondary Sync response parsing successful. DTG is: %s.\n", sync_response->dtg);
     }
 
     return ret;
