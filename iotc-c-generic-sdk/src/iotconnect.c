@@ -299,7 +299,11 @@ int iotconnect_sdk_init() {
     printf("ENV:  %s\n", config.env);
 
 
-    if (config.auth_info.type != IOTC_AT_X509 && config.auth_info.type != IOTC_AT_KEY  && config.auth_info.type != IOTC_AT_TPM) {
+    if (config.auth_info.type != IOTC_AT_TOKEN &&
+        config.auth_info.type != IOTC_AT_X509 &&
+        config.auth_info.type != IOTC_AT_TPM &&
+        config.auth_info.type != IOTC_AT_SYMMETRIC_KEY
+        ) {
         fprintf(stderr, "Error: Unsupported authentication type!\n");
         return -1;
     }
@@ -315,9 +319,10 @@ int iotconnect_sdk_init() {
         return -1;
     }
 
-#ifdef IOTC_USE_PAHO
-    if (config.auth_info.type == IOTC_AT_KEY) {
+    if (config.auth_info.type == IOTC_AT_SYMMETRIC_KEY) {
         if (config.auth_info.data.symmetric_key && strlen(config.auth_info.data.symmetric_key) > 0) {
+#ifdef IOTC_USE_PAHO
+            // for paho we need to pass the generated sas token
             char *sas_token = gen_sas_token(sync_response->broker.host,
                                                   config.cpid,
                                                   config.duid,
@@ -325,10 +330,22 @@ int iotconnect_sdk_init() {
                                                   60
             );
             free (sync_response->broker.pass);
-            sync_response->broker.pass = sas_token; // the token will be freed when freeing the sync response
+            // a bit of a hack - the token will be freed when freeing the sync response
+            // paho will use the borken pasword
+            sync_response->broker.pass = sas_token;
+#endif
+        } else {
+            fprintf(stderr, "Error: Configuration symmetric key is missing.\n");
+            return -1;
         }
     }
-#endif
+
+    if (config.auth_info.type == IOTC_AT_TOKEN) {
+        if (!(sync_response->broker.pass || strlen(config.auth_info.data.symmetric_key) == 0)) {
+            fprintf(stderr, "Error: Unable to obtainm .\n");
+            return -1;
+        }
+    }
     if (!iotcl_init(&lib_config)) {
         fprintf(stderr, "Error: Failed to initialize the IoTConnect Lib\n");
         return -1;

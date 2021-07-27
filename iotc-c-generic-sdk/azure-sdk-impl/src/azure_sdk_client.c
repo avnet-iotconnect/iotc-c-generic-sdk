@@ -13,10 +13,8 @@
 #include "iothub_message.h"
 #include "iothubtransportmqtt.h"
 #include "azure_c_shared_utility/threadapi.h"
-#include "azure_c_shared_utility/shared_util_options.h"
 
 #ifdef IOTC_USE_PROVISIONING
-#include "iothubtransportamqp.h"
 #include "azure_prov_client/prov_transport_amqp_client.h"
 #include "azure_prov_client/prov_device_ll_client.h"
 #include "azure_prov_client/prov_security_factory.h"
@@ -33,6 +31,7 @@
 
 #define IOTC_CONNECTION_STRING_FORMAT_KEY  "HostName=%s;DeviceId=%s;SharedAccessKey=%s"
 #define IOTC_CONNECTION_STRING_FORMAT_X509 "HostName=%s;DeviceId=%s;x509=true"
+#define IOTC_CONNECTION_STRING_FORMAT_SAS_TOKEN "HostName=%s;DeviceId=%s;SharedAccessSignature=%s"
 
 #ifndef IOTC_PROVISIONING_URL
 #define IOTC_PROVISIONING_URL "global.azure-devices-provisioning.net"
@@ -45,7 +44,7 @@ typedef struct DPS_CLIENT_INFO_TAG
     char* device_id;
     int registration_complete;
 } DPS_CLIENT_INFO;
-DPS_CLIENT_INFO user_ctx = {0};
+DPS_CLIENT_INFO dps_data = {0};
 #endif
 
 static bool is_client_active = false;
@@ -59,7 +58,7 @@ static IotConnectConnectionStatus connection_status = IOTC_CS_UNDEFINED;
 // file_to_string() credit: https://stackoverflow.com/questions/174531/how-to-read-the-content-of-a-file-to-a-string-in-c
 static char *file_to_string(const char *filename) {
     char *buffer = 0;
-    long length = 0;
+    long length;
     FILE *f = fopen(filename, "rb");
     size_t num_read = 0;
     if (f) {
@@ -85,9 +84,17 @@ static char *file_to_string(const char *filename) {
 static void client_deinit() {
     is_client_active = false;
     if (device_ll_handle) {
+        IoTHubDeviceClient_LL_DoWork(device_ll_handle);
+        ThreadAPI_Sleep(10);
         IoTHubDeviceClient_LL_Destroy(device_ll_handle);
         device_ll_handle = NULL;
     }
+#ifdef IOTC_USE_PROVISIONING
+    free(dps_data.device_id);
+    free(dps_data.iothub_uri);
+    memset(&dps_data, 0, sizeof(dps_data));
+    prov_dev_security_deinit();
+#endif
     c2d_msg_cb = NULL;
     status_cb = NULL;
 }
@@ -193,7 +200,7 @@ static void registration_status_callback(PROV_DEVICE_REG_STATUS reg_status, void
     (void)user_context;
     switch (reg_status) {
         case PROV_DEVICE_REG_STATUS_CONNECTED:
-            printf("Connected...\n");
+            printf("Connected to provisioning service...\n");
             break;
         case PROV_DEVICE_REG_STATUS_ASSIGNING:
             printf("Assigning...\n");
@@ -206,21 +213,15 @@ static void registration_status_callback(PROV_DEVICE_REG_STATUS reg_status, void
 
 static void register_device_callback(PROV_DEVICE_RESULT register_result, const char* iothub_uri, const char* device_id, void* user_context)
 {
-    if (user_context == NULL) {
-        fprintf(stderr, "user_context is NULL\n");
-    } else  {
-        DPS_CLIENT_INFO* user_ctx = (DPS_CLIENT_INFO*)user_context;
-        if (register_result == PROV_DEVICE_RESULT_OK) {
-            printf("Registration received: URI=%s device_id=%s.\n", iothub_uri, device_id);
-            mallocAndStrcpy_s(&user_ctx->iothub_uri, iothub_uri);
-            mallocAndStrcpy_s(&user_ctx->device_id, device_id);
-            user_ctx->registration_complete = 1;
-        }
-        else
-        {
-            fprintf(stderr, "Failure encountered during registration. Error code %d\n", register_result);
-            user_ctx->registration_complete = 2;
-        }
+    (void)user_context;
+    if (register_result == PROV_DEVICE_RESULT_OK) {
+        printf("Registration received: URI=%s device_id=%s.\n", iothub_uri, device_id);
+        mallocAndStrcpy_s(&dps_data.iothub_uri, iothub_uri);
+        mallocAndStrcpy_s(&dps_data.device_id, device_id);
+        dps_data.registration_complete = 1;
+    } else {
+        fprintf(stderr, "Failure encountered during registration. Error code %d\n", register_result);
+        dps_data.registration_complete = 2;
     }
 }
 IOTHUB_DEVICE_CLIENT_LL_HANDLE provision_with_dps(const char* id_scope, const char* registration_id) {
@@ -242,7 +243,7 @@ IOTHUB_DEVICE_CLIENT_LL_HANDLE provision_with_dps(const char* id_scope, const ch
     Prov_Device_LL_SetOption(prov_handle, PROV_OPTION_LOG_TRACE, &traceOn);
 #endif
 
-    if (Prov_Device_LL_Register_Device(prov_handle, register_device_callback, &user_ctx, registration_status_callback, &user_ctx) != PROV_DEVICE_RESULT_OK) {
+    if (Prov_Device_LL_Register_Device(prov_handle, register_device_callback, NULL, registration_status_callback, NULL) != PROV_DEVICE_RESULT_OK) {
         fprintf(stderr, "Failed calling Prov_Device_LL_Register_Device\n");
         return NULL;
     }
@@ -250,21 +251,23 @@ IOTHUB_DEVICE_CLIENT_LL_HANDLE provision_with_dps(const char* id_scope, const ch
     do {
         Prov_Device_LL_DoWork(prov_handle);
         ThreadAPI_Sleep(10);
-    } while (user_ctx.registration_complete == 0);
+    } while (dps_data.registration_complete == 0);
 
     Prov_Device_LL_Destroy(prov_handle);
 
-    if (user_ctx.registration_complete != 1) {
+    if (dps_data.registration_complete != 1) {
         (void)printf("Device registration failed!\n");
     }
 
     IOTHUB_DEVICE_CLIENT_LL_HANDLE device_handle;
     (void)printf("Creating IoTHub Device handle\n");
-    if ((device_handle = IoTHubDeviceClient_LL_CreateFromDeviceAuth(user_ctx.iothub_uri, user_ctx.device_id, MQTT_Protocol) ) == NULL) {
-        fprintf(stderr, "Failed create IoTHub with provisioned URI %s and device ID %s!\n", user_ctx.iothub_uri, user_ctx.device_id);
+    if ((device_handle = IoTHubDeviceClient_LL_CreateFromDeviceAuth(dps_data.iothub_uri, dps_data.device_id, MQTT_Protocol) ) == NULL) {
+        fprintf(stderr, "Failed create IoTHub with provisioned URI %s and device ID %s!\n", dps_data.iothub_uri, dps_data.device_id);
     }
-    free(user_ctx.iothub_uri);
-    free(user_ctx.device_id);
+    free(dps_data.iothub_uri);
+    dps_data.iothub_uri = NULL;
+    free(dps_data.device_id);
+    dps_data.device_id = NULL;
     return device_handle;
 }
 #endif
@@ -282,23 +285,23 @@ int iotc_device_client_init(IotConnectDeviceClientConfig *c) {
     char *connection_string_buffer = NULL;
 
     switch (c->auth->type) {
-        case IOTC_AT_KEY:
-            if (NULL == c->auth->data.symmetric_key || strlen(c->auth->data.symmetric_key) == 0) {
-                fprintf(stderr,
-                        "Basic auth is not supported with Azure C SDK implementation. Symmetric key is required\n");
+        case IOTC_AT_TOKEN:
+            if (NULL == c->sr->broker.pass || strlen(c->sr->broker.pass) == 0) {
+                fprintf(stderr, "Sync response did not return a SAS token. Is your device auth type set to Token?\n");
                 return -1;
             }
             connection_string_buffer = malloc(sizeof(IOTC_CONNECTION_STRING_FORMAT_KEY)
                                               + strlen(c->sr->broker.host)
                                               + strlen(c->sr->broker.client_id)
-                                              + strlen(c->auth->data.symmetric_key)
+                                              + strlen(c->sr->broker.pass)
             );
-            sprintf(connection_string_buffer, IOTC_CONNECTION_STRING_FORMAT_KEY,
+            sprintf(connection_string_buffer, IOTC_CONNECTION_STRING_FORMAT_SAS_TOKEN,
                     c->sr->broker.host,
                     c->sr->broker.client_id,
-                    c->auth->data.symmetric_key
+                    c->sr->broker.pass
             );
             break;
+
         case IOTC_AT_X509:
             connection_string_buffer = malloc(sizeof(IOTC_CONNECTION_STRING_FORMAT_X509)
                                               + strlen(c->sr->broker.host)
@@ -315,6 +318,22 @@ int iotc_device_client_init(IotConnectDeviceClientConfig *c) {
             return -1;
 #endif
             break;
+        case IOTC_AT_SYMMETRIC_KEY:
+            if (NULL == c->auth->data.symmetric_key || strlen(c->auth->data.symmetric_key) == 0) {
+                fprintf(stderr, "Symmetric key is required\n");
+                return -1;
+            }
+            connection_string_buffer = malloc(sizeof(IOTC_CONNECTION_STRING_FORMAT_KEY)
+                                              + strlen(c->sr->broker.host)
+                                              + strlen(c->sr->broker.client_id)
+                                              + strlen(c->auth->data.symmetric_key)
+            );
+            sprintf(connection_string_buffer, IOTC_CONNECTION_STRING_FORMAT_KEY,
+                    c->sr->broker.host,
+                    c->sr->broker.client_id,
+                    c->auth->data.symmetric_key
+            );
+            break;
         default:
             fprintf(stderr, "Unknown authentication type\n");
             return -1;
@@ -326,7 +345,7 @@ int iotc_device_client_init(IotConnectDeviceClientConfig *c) {
         device_ll_handle = provision_with_dps(c->auth->data.scope_id, c->sr->broker.client_id);
     } else
 #endif
-    { // curllies here just to match the above "else", not for scoping variables
+    { // curly brace here just to match the above "else", not for scoping variables
         device_ll_handle = IoTHubDeviceClient_LL_CreateFromConnectionString(connection_string_buffer, MQTT_Protocol);
     }
 

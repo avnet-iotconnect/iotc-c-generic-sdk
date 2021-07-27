@@ -16,11 +16,21 @@
 extern "C" {
 #endif
 
-
 typedef enum {
-    IOTC_AT_KEY = 1,
+    // Authentication based on your CPID. Sync HTTP endpoint returns a long lived SAS token
+    // This auth type is only intended as a simple way to connect your test and development devices
+    // and must not be used in production
+    IOTC_AT_TOKEN = 1,
+
+    // CA Cert and Self Signed Cert
     IOTC_AT_X509 = 2,
-    IOTC_AT_TPM = 4 // 4 for compatibility with sync
+
+    // TPM hardware devices
+    IOTC_AT_TPM = 4, // 4 for compatibility with sync
+
+    // IoTHub Key based authentication with Symmetric Keys (Primary or Secondary key)
+    IOTC_AT_SYMMETRIC_KEY = 5
+
 } IotConnectAuthType;
 
 typedef enum {

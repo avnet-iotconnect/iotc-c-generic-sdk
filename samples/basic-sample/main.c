@@ -148,9 +148,10 @@ int main(int argc, char *argv[]) {
         config->auth_info.data.cert_info.device_key = IOTCONNECT_IDENTITY_KEY;
     } else if (config->auth_info.type == IOTC_AT_TPM) {
         config->auth_info.data.scope_id = IOTCONNECT_SCOPE_ID;
-    } else if (config->auth_info.type == IOTC_AT_KEY){
+    } else if (config->auth_info.type == IOTC_AT_SYMMETRIC_KEY){
         config->auth_info.data.symmetric_key = IOTCONNECT_SYMMETRIC_KEY;
-    } else {
+    } else if (config->auth_info.type != IOTC_AT_TOKEN) { // token type does not need any secret or info
+        // none of the above
         fprintf(stderr, "IOTCONNECT_AUTH_TYPE is invalid\n");
         return -1;
     }
