@@ -54,6 +54,10 @@ int iotc_device_client_disconnect() {
     return rc;
 }
 
+void iotc_device_client_receive() {
+    ; // do nothing for paho
+}
+
 bool iotc_device_client_is_connected() {
     if (!is_initialized) {
         return false;

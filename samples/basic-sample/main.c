@@ -169,9 +169,15 @@ int main(int argc, char *argv[]) {
             fprintf(stderr, "IoTConnect exited with error code %d\n", ret);
             return ret;
         }
-        for (int i = 0; iotconnect_sdk_is_connected() && i < 500; i++) {
+
+        // send 10 messages
+        for (int i = 0; iotconnect_sdk_is_connected() && i < 10; i++) {
             publish_telemetry();
-            sleep(10);
+            // repeat approximately evey ~5 seconds
+            for (int k = 0; k < 500; k++) {
+                iotconnect_sdk_receive();
+                usleep(10000); // 10ms
+            }
         }
         iotconnect_sdk_disconnect();
     }

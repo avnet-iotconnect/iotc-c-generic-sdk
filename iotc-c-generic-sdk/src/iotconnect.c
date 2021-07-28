@@ -253,6 +253,10 @@ int iotconnect_sdk_send_packet(const char *data) {
     return iotc_device_client_send_message(data);
 }
 
+void iotconnect_sdk_receive() {
+    return iotc_device_client_receive();
+}
+
 ///////////////////////////////////////////////////////////////////////////////////
 // this the Initialization os IoTConnect SDK
 int iotconnect_sdk_init() {

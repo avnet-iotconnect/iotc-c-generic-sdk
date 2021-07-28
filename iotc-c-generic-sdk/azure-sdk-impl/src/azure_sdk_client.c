@@ -189,6 +189,13 @@ int iotc_device_client_send_message(const char *message) {
     }
 }
 
+
+void iotc_device_client_receive() {
+    if (is_iothub_initialized && device_ll_handle) {
+        IoTHubDeviceClient_LL_DoWork(device_ll_handle);
+    }
+}
+
 int iotc_device_client_send_message_qos(const char *message, int qos) {
     fprintf(stderr,
             "WARNING: QOS level and retry policy is currently not supported by the Azure Device SDK implementation");

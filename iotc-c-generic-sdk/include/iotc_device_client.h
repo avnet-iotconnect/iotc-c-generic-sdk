@@ -36,6 +36,8 @@ int iotc_device_client_send_message(const char *message);
 // sends message with specified qos
 int iotc_device_client_send_message_qos(const char *message, int qos);
 
+void iotc_device_client_receive();
+
 #ifdef __cplusplus
 }
 #endif
