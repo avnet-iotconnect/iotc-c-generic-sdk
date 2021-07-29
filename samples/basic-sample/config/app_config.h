@@ -7,18 +7,21 @@
 
 #include "iotconnect.h"
 
-#define IOTCONNECT_CPID "avtds"
-#define IOTCONNECT_ENV  "Avnet"
+#define IOTCONNECT_CPID "your-cpid"
+#define IOTCONNECT_ENV  "your-enviroment"
 
-#define IOTCONNECT_DUID "IGS01SGW01" // you can supply a custom device UID, or...
+// Device Unique ID
+// If using TPM, and this value is a blank string, Registration ID will be used from output of tpm_device_provision. Otherwise, the provide Device Uinque ID will be used.
+#define IOTCONNECT_DUID "your-device-unique-id"
 
 // from iotconnect.h IotConnectAuthType
 #define IOTCONNECT_AUTH_TYPE IOTC_AT_SYMMETRIC_KEY
 
-#define IOTCONNECT_SYMMETRIC_KEY "kn3Uo3+Z0Uy4tzINRsWobQ0ZGYvRpWEqyLY+SjS77YE="
+// if using Symmetric Key based authentication, provide the primary or secondary key here:
+#define IOTCONNECT_SYMMETRIC_KEY ""
 
-// to use TPM, enable IOTC_TPM_SUPPORT TPM support in cmake first
-#define IOTCONNECT_SCOPE_ID "One0005A911"// AKA ID Scope.
+// If using TPM, provide the Scope ID here:
+#define IOTCONNECT_SCOPE_ID ""// AKA ID Scope.
 
 #define IOTCONNECT_CERT_PATH "../certs"
 
