@@ -153,3 +153,8 @@ int iotc_device_client_init(IotConnectDeviceClientConfig *c) {
     return rc;
 }
 
+// not supported for PAHO
+char* iotc_device_client_get_tpm_registration_id() {
+    return NULL;
+}
+

@@ -14,11 +14,10 @@
 #include "iothubtransportmqtt.h"
 #include "azure_c_shared_utility/threadapi.h"
 
-#ifdef IOTC_USE_PROVISIONING
 #include "azure_prov_client/prov_transport_amqp_client.h"
 #include "azure_prov_client/prov_device_ll_client.h"
 #include "azure_prov_client/prov_security_factory.h"
-#endif
+#include "azure_prov_client/internal/prov_auth_client.h"
 
 #include "iotconnect.h"
 #include "iotc_device_client.h"
@@ -37,7 +36,6 @@
 #define IOTC_PROVISIONING_URL "global.azure-devices-provisioning.net"
 #endif
 
-#ifdef IOTC_USE_PROVISIONING
 typedef struct DPS_CLIENT_INFO_TAG
 {
     char* iothub_uri;
@@ -45,7 +43,6 @@ typedef struct DPS_CLIENT_INFO_TAG
     int registration_complete;
 } DPS_CLIENT_INFO;
 DPS_CLIENT_INFO dps_data = {0};
-#endif
 
 static bool is_client_active = false;
 static bool is_iothub_initialized = false;
@@ -89,12 +86,10 @@ static void client_deinit() {
         IoTHubDeviceClient_LL_Destroy(device_ll_handle);
         device_ll_handle = NULL;
     }
-#ifdef IOTC_USE_PROVISIONING
     free(dps_data.device_id);
     free(dps_data.iothub_uri);
     memset(&dps_data, 0, sizeof(dps_data));
     prov_dev_security_deinit();
-#endif
     c2d_msg_cb = NULL;
     status_cb = NULL;
 }
@@ -202,7 +197,6 @@ int iotc_device_client_send_message_qos(const char *message, int qos) {
     return iotc_device_client_send_message(message);
 }
 
-#ifdef IOTC_USE_PROVISIONING
 static void registration_status_callback(PROV_DEVICE_REG_STATUS reg_status, void* user_context) {
     (void)user_context;
     switch (reg_status) {
@@ -231,6 +225,22 @@ static void register_device_callback(PROV_DEVICE_RESULT register_result, const c
         dps_data.registration_complete = 2;
     }
 }
+
+// returned value needs to be freed
+char* iotc_device_client_get_tpm_registration_id() {
+    char *ret;
+    if (!is_client_active) {
+        prov_dev_security_init(SECURE_DEVICE_TYPE_TPM);
+    }
+    PROV_AUTH_HANDLE security_handle = prov_auth_create();
+    ret = prov_auth_get_registration_id(security_handle);
+    if (!is_client_active) {
+        prov_dev_security_deinit();
+    }
+    return ret;
+}
+
+
 IOTHUB_DEVICE_CLIENT_LL_HANDLE provision_with_dps(const char* id_scope, const char* registration_id) {
     printf("Provisioning...\n");
 
@@ -277,7 +287,6 @@ IOTHUB_DEVICE_CLIENT_LL_HANDLE provision_with_dps(const char* id_scope, const ch
     dps_data.device_id = NULL;
     return device_handle;
 }
-#endif
 
 int iotc_device_client_init(IotConnectDeviceClientConfig *c) {
 
@@ -320,10 +329,6 @@ int iotc_device_client_init(IotConnectDeviceClientConfig *c) {
             );
             break;
         case IOTC_AT_TPM:
-#ifndef IOTC_USE_PROVISIONING
-            fprintf(stderr, "Error: Need to enable IOTC_TPM_SUPPORT in the build\n");
-            return -1;
-#endif
             break;
         case IOTC_AT_SYMMETRIC_KEY:
             if (NULL == c->auth->data.symmetric_key || strlen(c->auth->data.symmetric_key) == 0) {
@@ -346,13 +351,9 @@ int iotc_device_client_init(IotConnectDeviceClientConfig *c) {
             return -1;
     }
 
-
-#ifdef IOTC_USE_PROVISIONING
     if (c->auth->type == IOTC_AT_TPM) {
         device_ll_handle = provision_with_dps(c->auth->data.scope_id, c->sr->broker.client_id);
-    } else
-#endif
-    { // curly brace here just to match the above "else", not for scoping variables
+    } else {
         device_ll_handle = IoTHubDeviceClient_LL_CreateFromConnectionString(connection_string_buffer, MQTT_Protocol);
     }
 

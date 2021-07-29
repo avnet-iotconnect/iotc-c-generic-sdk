@@ -38,6 +38,11 @@ int iotc_device_client_send_message_qos(const char *message, int qos);
 
 void iotc_device_client_receive();
 
+// Returns the TPM registration ID from the TPM chip.
+// Not supported in Paho Client. It will always return null.
+// The returned value MUST be freed.
+char* iotc_device_client_get_tpm_registration_id();
+
 #ifdef __cplusplus
 }
 #endif

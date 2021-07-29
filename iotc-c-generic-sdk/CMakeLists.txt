@@ -30,27 +30,18 @@ IF (IOTC_USE_PAHO)
     include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../lib/paho.mqtt.c/src)
     add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../lib/paho.mqtt.c paho.mqtt.c EXCLUDE_FROM_ALL)
 ELSE ()
-    IF (IOTC_TPM_SUPPORT)
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DIOTC_USE_PROVISIONING")
-        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DIOTC_USE_PROVISIONING")
-        set(use_amqp ON CACHE BOOL "") # we need to use AMQP to because the MQTT client doesn't support TPM HSM
-        set(use_prov_client ON CACHE BOOL "") # we need provisioning enabled for TPM
-        set(hsm_type_sastoken ON CACHE BOOL "") # TPM uses sas token type HSM
-    ELSE()
-        set(use_amqp OFF CACHE BOOL "")
-    ENDIF()
     set(use_http OFF CACHE BOOL "")
+    set(use_amqp ON CACHE BOOL "") # we need to use AMQP to because the MQTT client doesn't support TPM HSM
+    set(use_prov_client ON CACHE BOOL "") # we need provisioning enabled for TPM
+    set(hsm_type_sastoken ON CACHE BOOL "") # TPM uses sas token type HSM
     set(run_e2e_tests OFF CACHE BOOL "")
     set(build_service_client OFF CACHE BOOL "")
     set(skip_samples ON CACHE BOOL "")
 
-    #set(use_tpm_simulator ON CACHE BOOL "")
     include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../lib/azure-iot-sdk-c/deps/umock-c/inc)
     include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../lib/azure-iot-sdk-c/deps/azure-macro-utils-c/inc)
     include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../lib/azure-iot-sdk-c/iothub_client/inc)
-    IF (IOTC_TPM_SUPPORT)
-        include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../lib/azure-iot-sdk-c/provisioning_client/inc)
-    ENDIF()
+    include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../lib/azure-iot-sdk-c/provisioning_client/inc)
 
     add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../lib/azure-iot-sdk-c azure-iot-sdk-c EXCLUDE_FROM_ALL)
 ENDIF ()
@@ -82,18 +73,12 @@ IF (IOTC_USE_PAHO)
         target_link_libraries(iotc-c-generic-sdk paho-mqtt3cs)
     ENDIF ()
 ELSE ()
-    IF(IOTC_TPM_SUPPORT)
-         target_link_libraries(iotc-c-generic-sdk
-                 iothub_client
-                 iothub_client_mqtt_transport
-                 prov_device_client
-                 prov_amqp_transport
-                 )
-    ENDIF()
     target_link_libraries(iotc-c-generic-sdk
-            iothub_client
-            iothub_client_mqtt_transport
-            )
+        iothub_client
+        iothub_client_mqtt_transport
+        prov_device_client
+        prov_amqp_transport
+    )
 ENDIF ()
 
 target_link_libraries(iotc-c-generic-sdk cjson)

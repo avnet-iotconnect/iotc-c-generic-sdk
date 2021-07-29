@@ -22,7 +22,7 @@ Any device with this authentication method can connect to IoTConnect given the a
 is set to either Primary or Secondary key.     
 * **x509 (IOTC_AT_X509):** For devices with CA Certificate or Self-signed Certificate authentication types 
 store the device certificate and private key at the certs directory as *client-crt.pem* and *client-kep.pem* respectively before building.
-* **TPM (IOTC_AT_TPM):** The project needs to be built with Azure C SDK and TPM Support cmake options. 
+* **TPM (IOTC_AT_TPM):** If *IOTCONNECT_DUID* is blank, the TPM Registration ID will be obtained from TPM and it will be used in place of *IOTCONNECT_DUID*.
 *IOTCONNECT_SCOPE_ID* must be set to the Scope ID provided in your *Settings->Key Vault* section under the *DPS* tab as *Scope ID for TPM Devices*.
 
 See build instructions at thetop of theis repository on details on how to build the project.

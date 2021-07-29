@@ -24,6 +24,10 @@ static IotConnectClientConfig config = {0};
 static IotclDiscoveryResponse *discovery_response = NULL;
 static IotclSyncResponse *sync_response = NULL;
 
+// cached TPM registration ID if TPM auth is used
+// once (if) we support a discpose method, we should free this value
+static char *tpm_registration_id = NULL;
+
 static void dump_response(const char *message, IotConnectHttpResponse *response) {
     fprintf(stderr, "%s", message);
     if (response->data) {
@@ -118,7 +122,14 @@ static IotclDiscoveryResponse *run_http_discovery(const char *cpid, const char *
 
 static IotclSyncResponse *run_http_sync(const char *cpid, const char *uniqueid) {
     IotclSyncResponse *ret = NULL;
-
+    if (config.auth_info.type == IOTC_AT_TPM) {
+        if (!uniqueid || strlen(uniqueid) == 0) {
+            if (!tpm_registration_id) {
+                tpm_registration_id = iotc_device_client_get_tpm_registration_id();
+            }
+            uniqueid = tpm_registration_id;
+        }
+    }
     char *url_buff = malloc(sizeof(HTTP_SYNC_URL_FORMAT) +
                             strlen(discovery_response->host) +
                             strlen(discovery_response->path)
@@ -357,6 +368,7 @@ int iotconnect_sdk_init() {
 
     IotConnectDeviceClientConfig pc;
     pc.sr = sync_response;
+    pc.qos = config.qos;
     pc.status_cb = config.status_cb;
     pc.c2d_msg_cb = on_mqtt_c2d_message;
     pc.auth = &config.auth_info;
