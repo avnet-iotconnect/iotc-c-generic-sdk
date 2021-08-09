@@ -24,6 +24,10 @@ static IotConnectClientConfig config = {0};
 static IotclDiscoveryResponse *discovery_response = NULL;
 static IotclSyncResponse *sync_response = NULL;
 
+// cached TPM registration ID if TPM auth is used
+// once (if) we support a discpose method, we should free this value
+static char *tpm_registration_id = NULL;
+
 static void dump_response(const char *message, IotConnectHttpResponse *response) {
     fprintf(stderr, "%s", message);
     if (response->data) {
@@ -118,7 +122,14 @@ static IotclDiscoveryResponse *run_http_discovery(const char *cpid, const char *
 
 static IotclSyncResponse *run_http_sync(const char *cpid, const char *uniqueid) {
     IotclSyncResponse *ret = NULL;
-
+    if (config.auth_info.type == IOTC_AT_TPM) {
+        if (!uniqueid || strlen(uniqueid) == 0) {
+            if (!tpm_registration_id) {
+                tpm_registration_id = iotc_device_client_get_tpm_registration_id();
+            }
+            uniqueid = tpm_registration_id;
+        }
+    }
     char *url_buff = malloc(sizeof(HTTP_SYNC_URL_FORMAT) +
                             strlen(discovery_response->host) +
                             strlen(discovery_response->path)
@@ -167,9 +178,16 @@ static IotclSyncResponse *run_http_sync(const char *cpid, const char *uniqueid) 
 
     ret = iotcl_discovery_parse_sync_response(json_start);
     if (!ret || ret->ds != IOTCL_SR_OK) {
-        report_sync_error(ret, response.data);
-        iotcl_discovery_free_sync_response(ret);
-        ret = NULL;
+        if (config.auth_info.type == IOTC_AT_TPM && ret && ret->ds == IOTCL_SR_DEVICE_NOT_REGISTERED) {
+            // malloc below will be freed when we iotcl_discovery_free_sync_response
+            ret->broker.client_id = malloc(strlen(uniqueid) + 1 /* - */ + strlen(cpid) + 1);
+            sprintf(ret->broker.client_id, "%s-%s", cpid, uniqueid);
+            printf("TPM Device is not yet enrolled. Enrolling...\n");
+        } else {
+            report_sync_error(ret, response.data);
+            iotcl_discovery_free_sync_response(ret);
+            ret = NULL;
+        }
     }
 
     cleanup:
@@ -246,6 +264,10 @@ int iotconnect_sdk_send_packet(const char *data) {
     return iotc_device_client_send_message(data);
 }
 
+void iotconnect_sdk_receive() {
+    return iotc_device_client_receive();
+}
+
 ///////////////////////////////////////////////////////////////////////////////////
 // this the Initialization os IoTConnect SDK
 int iotconnect_sdk_init() {
@@ -286,13 +308,17 @@ int iotconnect_sdk_init() {
     lib_config.telemetry.dtg = sync_response->dtg;
 
     char cpid_buff[5];
-    strncpy(cpid_buff, sync_response->cpid, 4);
+    strncpy(cpid_buff, config.cpid, 4);
     cpid_buff[4] = 0;
     printf("CPID: %s***\n", cpid_buff);
     printf("ENV:  %s\n", config.env);
 
 
-    if (config.auth_info.type != IOTC_X509 && config.auth_info.type != IOTC_KEY) {
+    if (config.auth_info.type != IOTC_AT_TOKEN &&
+        config.auth_info.type != IOTC_AT_X509 &&
+        config.auth_info.type != IOTC_AT_TPM &&
+        config.auth_info.type != IOTC_AT_SYMMETRIC_KEY
+        ) {
         fprintf(stderr, "Error: Unsupported authentication type!\n");
         return -1;
     }
@@ -301,16 +327,17 @@ int iotconnect_sdk_init() {
         fprintf(stderr, "Error: Configuration server certificate is required.\n");
         return -1;
     }
-    if (config.auth_info.type == IOTC_X509 && (
+    if (config.auth_info.type == IOTC_AT_X509 && (
             !config.auth_info.data.cert_info.device_cert ||
             !config.auth_info.data.cert_info.device_key)) {
         fprintf(stderr, "Error: Configuration authentication info is invalid.\n");
         return -1;
     }
 
-#ifdef IOTC_USE_PAHO
-    if (config.auth_info.type == IOTC_KEY) {
+    if (config.auth_info.type == IOTC_AT_SYMMETRIC_KEY) {
         if (config.auth_info.data.symmetric_key && strlen(config.auth_info.data.symmetric_key) > 0) {
+#ifdef IOTC_USE_PAHO
+            // for paho we need to pass the generated sas token
             char *sas_token = gen_sas_token(sync_response->broker.host,
                                                   config.cpid,
                                                   config.duid,
@@ -318,10 +345,22 @@ int iotconnect_sdk_init() {
                                                   60
             );
             free (sync_response->broker.pass);
-            sync_response->broker.pass = sas_token; // the token will be freed when freeing the sync response
+            // a bit of a hack - the token will be freed when freeing the sync response
+            // paho will use the borken pasword
+            sync_response->broker.pass = sas_token;
+#endif
+        } else {
+            fprintf(stderr, "Error: Configuration symmetric key is missing.\n");
+            return -1;
         }
     }
-#endif
+
+    if (config.auth_info.type == IOTC_AT_TOKEN) {
+        if (!(sync_response->broker.pass || strlen(config.auth_info.data.symmetric_key) == 0)) {
+            fprintf(stderr, "Error: Unable to obtainm .\n");
+            return -1;
+        }
+    }
     if (!iotcl_init(&lib_config)) {
         fprintf(stderr, "Error: Failed to initialize the IoTConnect Lib\n");
         return -1;
@@ -329,6 +368,7 @@ int iotconnect_sdk_init() {
 
     IotConnectDeviceClientConfig pc;
     pc.sr = sync_response;
+    pc.qos = config.qos;
     pc.status_cb = config.status_cb;
     pc.c2d_msg_cb = on_mqtt_c2d_message;
     pc.auth = &config.auth_info;
@@ -337,6 +377,19 @@ int iotconnect_sdk_init() {
     if (ret) {
         fprintf(stderr, "Failed to connect!\n");
         return ret;
+    }
+
+    // Workaround: upon first time TPM registration, the information returned from sync will be partial,
+    // so update dtg with new sync call
+    if (config.auth_info.type == IOTC_AT_TPM && sync_response->ds == IOTCL_SR_DEVICE_NOT_REGISTERED) {
+        iotcl_discovery_free_sync_response(sync_response);
+        lib_config.telemetry.dtg = sync_response->dtg;
+        sync_response = run_http_sync(config.cpid, config.duid);
+        if (NULL == sync_response) {
+            // Sync_call will print the error
+            return -2;
+        }
+        printf("Secondary Sync response parsing successful. DTG is: %s.\n", sync_response->dtg);
     }
 
     return ret;

@@ -126,7 +126,7 @@ int main(int argc, char *argv[]) {
                IOTCONNECT_SERVER_CERT);
     }
 
-    if (IOTCONNECT_AUTH_TYPE == IOTC_X509) {
+    if (IOTCONNECT_AUTH_TYPE == IOTC_AT_X509) {
         if (access(IOTCONNECT_IDENTITY_CERT, F_OK) != 0 ||
             access(IOTCONNECT_IDENTITY_KEY, F_OK) != 0
                 ) {
@@ -143,11 +143,17 @@ int main(int argc, char *argv[]) {
     config->auth_info.type = IOTCONNECT_AUTH_TYPE;
     config->auth_info.trust_store = IOTCONNECT_SERVER_CERT;
 
-    if (config->auth_info.type == IOTC_X509) {
+    if (config->auth_info.type == IOTC_AT_X509) {
         config->auth_info.data.cert_info.device_cert = IOTCONNECT_IDENTITY_CERT;
         config->auth_info.data.cert_info.device_key = IOTCONNECT_IDENTITY_KEY;
-    } else {
+    } else if (config->auth_info.type == IOTC_AT_TPM) {
+        config->auth_info.data.scope_id = IOTCONNECT_SCOPE_ID;
+    } else if (config->auth_info.type == IOTC_AT_SYMMETRIC_KEY){
         config->auth_info.data.symmetric_key = IOTCONNECT_SYMMETRIC_KEY;
+    } else if (config->auth_info.type != IOTC_AT_TOKEN) { // token type does not need any secret or info
+        // none of the above
+        fprintf(stderr, "IOTCONNECT_AUTH_TYPE is invalid\n");
+        return -1;
     }
 
 
@@ -160,12 +166,18 @@ int main(int argc, char *argv[]) {
     for (int j = 0; j < 10; j++) {
         int ret = iotconnect_sdk_init();
         if (0 != ret) {
-            fprintf(stderr, "IoTConnect exited with error code %d", ret);
+            fprintf(stderr, "IoTConnect exited with error code %d\n", ret);
             return ret;
         }
-        for (int i = 0; iotconnect_sdk_is_connected() && i < 500; i++) {
+
+        // send 10 messages
+        for (int i = 0; iotconnect_sdk_is_connected() && i < 10; i++) {
             publish_telemetry();
-            sleep(10);
+            // repeat approximately evey ~5 seconds
+            for (int k = 0; k < 500; k++) {
+                iotconnect_sdk_receive();
+                usleep(10000); // 10ms
+            }
         }
         iotconnect_sdk_disconnect();
     }

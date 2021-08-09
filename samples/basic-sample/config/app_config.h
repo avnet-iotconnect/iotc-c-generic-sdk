@@ -7,23 +7,30 @@
 
 #include "iotconnect.h"
 
-#define IOTCONNECT_CPID "your-cpid" // Account Settings -> Key Vault
-#define IOTCONNECT_ENV  "your-environment" // Account Settings -> Key Vault
+#define IOTCONNECT_CPID "your-cpid"
+#define IOTCONNECT_ENV  "your-enviroment"
 
-#define IOTCONNECT_DUID "test-device" // you can supply a custom device UID, or...
+// Device Unique ID
+// If using TPM, and this value is a blank string, Registration ID will be used from output of tpm_device_provision. Otherwise, the provide Device Uinque ID will be used.
+#define IOTCONNECT_DUID "your-device-unique-id"
 
-// from iotconnect.h
-// If IOTC_KEY is used, but IOTCONNECT_SYMMETRIC_KEY string length is 0, simple key-based authentication is used
-// which should only be used for testing and never in production.
-#define IOTCONNECT_AUTH_TYPE IOTC_KEY
-#define IOTCONNECT_SYMMETRIC_KEY "your-symmetric-key" // In device connection info panel
-// If executing from cmake-build-debug
+// from iotconnect.h IotConnectAuthType
+#define IOTCONNECT_AUTH_TYPE IOTC_AT_SYMMETRIC_KEY
+
+// if using Symmetric Key based authentication, provide the primary or secondary key here:
+#define IOTCONNECT_SYMMETRIC_KEY ""
+
+// If using TPM, provide the Scope ID here:
+#define IOTCONNECT_SCOPE_ID ""// AKA ID Scope.
+
 #define IOTCONNECT_CERT_PATH "../certs"
+
+// This is the CA Certificate used to validate the IoTHub TLS Connection and it is required for all authentication types.
+// Alternatively, you can point this file to /etc/ssl/certs/Baltimore_CyberTrust_Root.pem on some Linux systems
 #define IOTCONNECT_SERVER_CERT (IOTCONNECT_CERT_PATH "/server.pem")
 
 // if IOTC_X509 is used:
 #define IOTCONNECT_IDENTITY_CERT (IOTCONNECT_CERT_PATH "/client-crt.pem")
 #define IOTCONNECT_IDENTITY_KEY (IOTCONNECT_CERT_PATH "/client-key.pem")
-
 
 #endif //APP_CONFIG_H

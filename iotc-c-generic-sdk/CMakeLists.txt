@@ -3,6 +3,12 @@ cmake_minimum_required(VERSION 3.0.2)
 project(iotc-generic-c-sdk)
 
 option(IOTC_USE_PAHO "Use Paho Client. Otherwise the Azure Device SDK will be used." OFF)
+option(IOTC_TPM_SUPPORT "Support TPM devices. Implies compiling support from provisioning client in Azure SDK"  OFF)
+
+IF (IOTC_USE_PAHO AND IOTC_TPM_SUPPORT)
+    MESSAGE(FATAL_ERROR "TPM functionality is not supported by Paho")
+ENDIF()
+
 
 #cJSON
 set(ENABLE_CJSON_TEST OFF CACHE BOOL "CJson - Build Tests")
@@ -10,6 +16,11 @@ set(ENABLE_CUSTOM_COMPILER_FLAGS OFF CACHE BOOL "CJson - Custom Compiler Flags")
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../lib/cJSON cJSON EXCLUDE_FROM_ALL)
 
 IF (IOTC_USE_PAHO)
+
+    IF (IOTC_TPM_SUPPORT)
+        MESSAGE(FATAL_ERROR "TPM functionality is not supported with the Paho client implementation")
+    ENDIF()
+
     #paho.mqtt.c
     set(PAHO_BUILD_SHARED OFF CACHE BOOL "Paho - Build with Shared Libraries")
     set(PAHO_BUILD_STATIC ON CACHE BOOL "Paho - Build with Static Libraries")
@@ -19,14 +30,19 @@ IF (IOTC_USE_PAHO)
     include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../lib/paho.mqtt.c/src)
     add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../lib/paho.mqtt.c paho.mqtt.c EXCLUDE_FROM_ALL)
 ELSE ()
-    set(use_amqp OFF CACHE BOOL "")
     set(use_http OFF CACHE BOOL "")
+    set(use_amqp ON CACHE BOOL "") # we need to use AMQP to because the MQTT client doesn't support TPM HSM
+    set(use_prov_client ON CACHE BOOL "") # we need provisioning enabled for TPM
+    set(hsm_type_sastoken ON CACHE BOOL "") # TPM uses sas token type HSM
     set(run_e2e_tests OFF CACHE BOOL "")
     set(build_service_client OFF CACHE BOOL "")
-    #set(use_tpm_simulator ON CACHE BOOL "")
+    set(skip_samples ON CACHE BOOL "")
+
     include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../lib/azure-iot-sdk-c/deps/umock-c/inc)
     include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../lib/azure-iot-sdk-c/deps/azure-macro-utils-c/inc)
     include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../lib/azure-iot-sdk-c/iothub_client/inc)
+    include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../lib/azure-iot-sdk-c/provisioning_client/inc)
+
     add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../lib/azure-iot-sdk-c azure-iot-sdk-c EXCLUDE_FROM_ALL)
 ENDIF ()
 
@@ -58,9 +74,11 @@ IF (IOTC_USE_PAHO)
     ENDIF ()
 ELSE ()
     target_link_libraries(iotc-c-generic-sdk
-            iothub_client
-            iothub_client_mqtt_transport
-            )
+        iothub_client
+        iothub_client_mqtt_transport
+        prov_device_client
+        prov_amqp_transport
+    )
 ENDIF ()
 
 target_link_libraries(iotc-c-generic-sdk cjson)

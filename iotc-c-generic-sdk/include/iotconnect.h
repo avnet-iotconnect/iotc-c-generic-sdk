@@ -16,15 +16,21 @@
 extern "C" {
 #endif
 
-
 typedef enum {
-    // Any device keys are publicly available to anyone who can discover your CPID
-    // at https://<your api host>.iotconnect.io/api/2.0/agent/sync?
-    // Key based authentication is only recommended for quick testing and should NEVER be used in production
-    // as it does not offer the same level af security as IoTHub
-    IOTC_KEY,
+    // Authentication based on your CPID. Sync HTTP endpoint returns a long lived SAS token
+    // This auth type is only intended as a simple way to connect your test and development devices
+    // and must not be used in production
+    IOTC_AT_TOKEN = 1,
 
-    IOTC_X509
+    // CA Cert and Self Signed Cert
+    IOTC_AT_X509 = 2,
+
+    // TPM hardware devices
+    IOTC_AT_TPM = 4, // 4 for compatibility with sync
+
+    // IoTHub Key based authentication with Symmetric Keys (Primary or Secondary key)
+    IOTC_AT_SYMMETRIC_KEY = 5
+
 } IotConnectAuthType;
 
 typedef enum {
@@ -44,6 +50,7 @@ typedef struct {
             char* device_key; // Path to a file containing the device private key in PEM format
         } cert_info;
         char *symmetric_key;
+        char *scope_id; // for TPM authentication. AKA: ID Scope
     } data;
 } IotConnectAuthInfo;
 
@@ -62,12 +69,20 @@ typedef struct {
 
 IotConnectClientConfig *iotconnect_sdk_init_and_get_config();
 
+// call iotconnect_sdk_init_and_get_config first and configure the SDK before calling iotconnect_sdk_init()
 int iotconnect_sdk_init();
 
 bool iotconnect_sdk_is_connected();
 
+// Can be used to pass to telemetry functions
 IotclConfig *iotconnect_sdk_get_lib_config();
 
+// Will check if there are inbound messages and call adequate callbacks if there are any
+// This is technically not required for the Paho implementation.
+void iotconnect_sdk_receive();
+
+// blocks until sent and returns 0 if successful.
+// data is a null-terminated string
 int iotconnect_sdk_send_packet(const char *data);
 
 void iotconnect_sdk_disconnect();

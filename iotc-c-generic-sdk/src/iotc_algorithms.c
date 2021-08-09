@@ -123,7 +123,7 @@ char *gen_sas_token(const char *host, const char *cpid, const char *duid, char *
 
     unsigned char digest[EVP_MAX_MD_SIZE];;
     unsigned int digest_len = 0;
-    hmac_sha256(key, bufflen, string_to_sign, strlen(string_to_sign), digest, &digest_len);
+    hmac_sha256(key, (int) bufflen, (const unsigned char*) string_to_sign, (int) strlen(string_to_sign), digest, &digest_len);
     free(key);
     free(string_to_sign);
 
