@@ -94,8 +94,8 @@ static void client_deinit() {
     status_cb = NULL;
 }
 
-static void send_confirm_callback(IOTHUB_CLIENT_CONFIRMATION_RESULT result, void *userContextCallback) {
-    (void) userContextCallback;
+static void send_confirm_callback(IOTHUB_CLIENT_CONFIRMATION_RESULT result, void *user_context_callback) {
+    (void) user_context_callback;
     if (IOTHUB_CLIENT_CONFIRMATION_OK == result) {
         is_message_confirmed = true;
     } else {
