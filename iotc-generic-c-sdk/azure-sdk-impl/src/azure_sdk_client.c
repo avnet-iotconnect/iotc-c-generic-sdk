@@ -56,7 +56,7 @@ static IotConnectConnectionStatus connection_status = IOTC_CS_UNDEFINED;
 // file_to_string() credit: https://stackoverflow.com/questions/174531/how-to-read-the-content-of-a-file-to-a-string-in-c
 static char *file_to_string(const char *filename) {
     char *buffer = 0;
-    long length;
+    long length = 0;
     FILE *f = fopen(filename, "rb");
     size_t num_read = 0;
     if (f) {
@@ -172,7 +172,7 @@ int iotc_device_client_send_message(const char *message) {
     IOTHUB_MESSAGE_HANDLE message_handle = IoTHubMessage_CreateFromString(message);
     is_message_confirmed = false;
     if (IoTHubDeviceClient_LL_SendEventAsync(device_ll_handle, message_handle, send_confirm_callback, NULL) !=
-        IOTHUB_MESSAGE_OK) {
+        IOTHUB_CLIENT_OK) {
         fprintf(stderr, "Error: Failed to send message: %s", message);
     }
     IoTHubMessage_Destroy(message_handle);
