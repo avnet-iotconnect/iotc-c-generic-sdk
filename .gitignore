@@ -6,3 +6,5 @@ build/
 #private client authentication files
 client-crt.pem
 client-key.pem
+
+.vscode/

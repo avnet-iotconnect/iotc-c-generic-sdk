@@ -385,11 +385,11 @@ int iotconnect_sdk_init() {
     if (config.auth_info.type == IOTC_AT_TPM && sync_response->ds == IOTCL_SR_DEVICE_NOT_REGISTERED) {
         iotcl_discovery_free_sync_response(sync_response);
         sync_response = run_http_sync(config.cpid, config.duid);
-        lib_config.telemetry.dtg = sync_response->dtg;
         if (NULL == sync_response) {
             // Sync_call will print the error
             return -2;
         }
+        lib_config.telemetry.dtg = sync_response->dtg;
         printf("Secondary Sync response parsing successful. DTG is: %s.\n", sync_response->dtg);
     }
 
