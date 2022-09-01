@@ -38,10 +38,11 @@ int iotconnect_https_request(
         const char *send_str
 ) {
     CURL *curl;
-    CURLcode res;
+    CURLcode res = (!CURLE_OK); /* FIXME there's probably a better value to initialize this too */
 
     if (NULL == response) {
         fprintf(stderr, "iotconnect_https_request() requires a valid IotConnectHttpResponse pointer.");
+        return res;
     }
     response->data = NULL;
 
