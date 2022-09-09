@@ -133,39 +133,24 @@ static void publish_telemetry() {
 
 
 int main(int argc, char *argv[]) {
-    if (access(IOTCONNECT_SERVER_CERT, F_OK) != 0) {
-        fprintf(stderr, "Unable to access IOTCONNECT_SERVER_CERT. "
-               "Please change directory so that %s can be accessed from the application or update IOTCONNECT_CERT_PATH\n",
-               IOTCONNECT_SERVER_CERT);
-    }
+    // set this first so that iotconnect_sdk_set_auth_xxx() routines have this information available
+    iotconnect_sdk_set_auth_type(IOTCONNECT_AUTH_TYPE);
 
-    if (IOTCONNECT_AUTH_TYPE == IOTC_AT_X509) {
-        if (access(IOTCONNECT_IDENTITY_CERT, F_OK) != 0 ||
-            access(IOTCONNECT_IDENTITY_KEY, F_OK) != 0
-                ) {
-            fprintf(stderr, "Unable to access device identity private key and certificate. "
-                   "Please change directory so that %s can be accessed from the application or update IOTCONNECT_CERT_PATH\n",
-                   IOTCONNECT_SERVER_CERT);
-        }
-    }
-
-    IotConnectClientConfig *config = iotconnect_sdk_init_and_get_config();
     iotconnect_sdk_set_config_cpid(IOTCONNECT_CPID);
     iotconnect_sdk_set_config_env(IOTCONNECT_ENV);
     iotconnect_sdk_set_config_duid(IOTCONNECT_DUID);
-    iotconnect_sdk_set_config_trust_store(IOTCONNECT_SERVER_CERT);
+    iotconnect_sdk_set_auth_trust_store(IOTCONNECT_SERVER_CERT);
 
-    iotconnect_sdk_set_config_auth_type(IOTCONNECT_AUTH_TYPE);
     switch(IOTCONNECT_AUTH_TYPE) {
         case IOTC_AT_X509:
-            iotconnect_sdk_set_config_device_cert(IOTCONNECT_IDENTITY_CERT);
-            iotconnect_sdk_set_config_device_key(IOTCONNECT_IDENTITY_KEY);
+            iotconnect_sdk_set_auth_device_cert(IOTCONNECT_IDENTITY_CERT);
+            iotconnect_sdk_set_auth_device_key(IOTCONNECT_IDENTITY_KEY);
             break;
         case IOTC_AT_TPM:
-            iotconnect_sdk_set_config_scope_id(IOTCONNECT_SCOPE_ID);
+            iotconnect_sdk_set_auth_scope_id(IOTCONNECT_SCOPE_ID);
             break;
         case IOTC_AT_SYMMETRIC_KEY:
-            iotconnect_sdk_set_config_symmetric_key(IOTCONNECT_SYMMETRIC_KEY);
+            iotconnect_sdk_set_auth_symmetric_key(IOTCONNECT_SYMMETRIC_KEY);
             break;
         case IOTC_AT_TOKEN:
             // token type does not need any secret or info
@@ -175,11 +160,11 @@ int main(int argc, char *argv[]) {
             return -1;
     }
 
-
     iotconnect_sdk_set_config_status_cb(on_connection_status);
     iotconnect_sdk_set_config_ota_cb(on_ota);
     iotconnect_sdk_set_config_cmd_cb(on_command);
 
+    iotconnect_sdk_dump_configuration();
 
     // run a dozen connect/send/disconnect cycles with each cycle being about a minute
     for (int j = 0; j < 10; j++) {
