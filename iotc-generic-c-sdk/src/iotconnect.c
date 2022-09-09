@@ -216,10 +216,6 @@ IotConnectClientConfig *iotconnect_sdk_init_and_get_config(void) {
     return &config;
 }
 
-IotclConfig *iotconnect_sdk_get_lib_config(void) {
-    return iotcl_get_config();
-}
-
 static void on_message_intercept(IotclEventData data, IotConnectEventType type) {
     switch (type) {
         case ON_FORCE_SYNC:
@@ -257,7 +253,7 @@ int iotconnect_sdk_send_packet(const char *data) {
 }
 
 void iotconnect_sdk_receive(void) {
-    return iotc_device_client_receive();
+    iotc_device_client_receive();
 }
 
 ///////////////////////////////////////////////////////////////////////////////////

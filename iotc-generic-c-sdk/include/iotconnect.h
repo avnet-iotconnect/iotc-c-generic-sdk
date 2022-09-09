@@ -74,9 +74,6 @@ int iotconnect_sdk_init(void);
 
 bool iotconnect_sdk_is_connected(void);
 
-// Can be used to pass to telemetry functions
-IotclConfig *iotconnect_sdk_get_lib_config(void);
-
 // Will check if there are inbound messages and call adequate callbacks if there are any
 // This is technically not required for the Paho implementation.
 void iotconnect_sdk_receive(void);

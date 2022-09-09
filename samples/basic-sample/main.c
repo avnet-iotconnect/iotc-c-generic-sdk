@@ -116,7 +116,7 @@ static void on_ota(IotclEventData data) {
 
 
 static void publish_telemetry() {
-    IotclMessageHandle msg = iotcl_telemetry_create(iotconnect_sdk_get_lib_config());
+    IotclMessageHandle msg = iotcl_telemetry_create();
 
     // Optional. The first time you create a data point, the current timestamp will be automatically added
     // TelemetryAddWith* calls are only required if sending multiple data points in one packet.
@@ -131,6 +131,9 @@ static void publish_telemetry() {
     iotcl_destroy_serialized(str);
 }
 
+
+void iotconnect_sdk_set_config_cpid(char *cpid) {
+}
 
 int main(int argc, char *argv[]) {
     if (access(IOTCONNECT_SERVER_CERT, F_OK) != 0) {
