@@ -66,6 +66,7 @@ typedef struct {
     IotConnectStatusCallback status_cb; // callback for connection status
 } IotConnectClientConfig;
 
+void iotconnect_sdk_dump_configuration(void);
 
 IotConnectClientConfig *iotconnect_sdk_init_and_get_config(void);
 

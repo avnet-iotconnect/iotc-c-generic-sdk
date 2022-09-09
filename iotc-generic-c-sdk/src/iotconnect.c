@@ -14,6 +14,20 @@
 #include "iotc_http_request.h"
 #include "iotc_device_client.h"
 
+// windows compatibility
+#if defined(_WIN32) || defined(_WIN64)
+
+#ifdef _access_s
+#define F_OK 0
+#include <Windows.h>
+#include <io.h>
+#define access    _access_s
+#endif /* _access_s */
+
+#else
+#include <unistd.h>
+#endif
+
 #define HTTP_DISCOVERY_URL_FORMAT "https://%s/api/sdk/cpid/%s/lang/M_C/ver/2.0/env/%s"
 #define HTTP_SYNC_URL_FORMAT "https://%s%ssync?"
 
@@ -209,7 +223,7 @@ static void on_mqtt_c2d_message(const unsigned char *message, size_t message_len
 
     memcpy(str, message, message_len);
     str[message_len] = 0;
-    printf("event>>> %s\n", str);
+    printf("event >> %s\n", str);
     if (!iotcl_process_event(str)) {
         fprintf(stderr, "Error encountered while processing %s\n", str);
     }
@@ -230,6 +244,41 @@ bool iotconnect_sdk_is_connected(void) {
 IotConnectClientConfig *iotconnect_sdk_init_and_get_config(void) {
     memset(&config, 0, sizeof(config));
     return &config;
+}
+
+// For debugging
+void iotconnect_sdk_dump_configuration() {
+    printf("Settings -> Key Vault -> Environment: %s\n", config.env);
+    printf("Settings -> Key Vault -> CPID: %s\n", config.cpid);
+    printf("Name of the device: %s\n", config.duid);
+    printf("QoS: %d\n", config.qos);
+    printf("Callback for OTA events: %p\n", config.ota_cb);
+    printf("Callback for command events: %p\n", config.cmd_cb);
+    printf("Callback for ALL messages, including the specific ones like cmd or ota callback: %p\n", config.msg_cb);
+    printf("Callback for connection status: %p\n", config.status_cb);
+    printf("\n");
+    printf("Path to a file containing the trust certificates for the remote MQTT host: %s\n", config.auth_info.trust_store);
+    switch(config.auth_info.type) {
+        case IOTC_AT_X509:
+            printf("Auth type: IOTC_AT_X509\n");
+            printf("Path to a file containing the device CA cert (or chain) in PEM format: %s\n", config.auth_info.data.cert_info.device_cert);
+            printf("Path to a file containing the device private key in PEM format: %s\n", config.auth_info.data.cert_info.device_key);
+            break;
+        case IOTC_AT_TPM:
+            printf("Auth type: IOTC_AT_TPM\n");
+            printf("TPM authentication. AKA: ID Scope: %s\n", config.auth_info.data.scope_id);
+            break;
+        case IOTC_AT_SYMMETRIC_KEY:
+            printf("Auth type: IOTC_AT_SYMMETRIC_KEY\n");
+            printf("Symmetric key: %s\n", config.auth_info.data.symmetric_key);
+            break;
+        case IOTC_AT_TOKEN:
+            printf("Auth type: IOTC_AT_TOKEN\n");
+            break;
+        default: printf("Auth type: unknown\n");
+            break;
+    }
+
 }
 
 static void on_message_intercept(IotclEventData data, IotConnectEventType type) {
@@ -276,9 +325,48 @@ void iotconnect_sdk_receive(void) {
 }
 
 ///////////////////////////////////////////////////////////////////////////////////
-// this the Initialization os IoTConnect SDK
+// this is the Initialization of IoTConnect SDK
 int iotconnect_sdk_init(void) {
     int ret;
+
+// Double-check that an access() function is defined.
+#ifdef access
+    // Obviously filename checks have TOCTOU issues, but they are what they are...
+    if (access(config.auth_info.trust_store, F_OK) != 0) {
+        fprintf(stderr, "Unable to access IOTCONNECT_SERVER_CERT. " // FIXME is this still correct debug?
+               "Please change directory so that %s can be accessed from the application or update IOTCONNECT_CERT_PATH and recompile\n",
+               config.auth_info.trust_store);
+    }
+
+    switch(config.auth_info.type) {
+        case IOTC_AT_X509:
+            if (access(config.auth_info.data.cert_info.device_key, F_OK) != 0) {
+                fprintf(stderr, "Unable to access device identity private key. "
+                        "Please change directory so that %s can be accessed from the application or update IOTCONNECT_CERT_PATH and recompile\n",
+                        config.auth_info.data.cert_info.device_key);
+                        return -1;
+            }
+
+            if (access(config.auth_info.data.cert_info.device_cert, F_OK) != 0) {
+                fprintf(stderr, "Unable to access device identity certificate. "
+                        "Please change directory so that %s can be accessed from the application or update IOTCONNECT_CERT_PATH and recompile\n",
+                        config.auth_info.data.cert_info.device_cert);
+                        return -1;
+            }
+            break;
+        case IOTC_AT_TPM:
+            // Not sure how to validate scope_id, non-NULL and non-empty? FIXME
+            break;
+        case IOTC_AT_SYMMETRIC_KEY:
+            // Not sure how to validate symmetric_key, non-NULL and non-empty? FIXME
+            break;
+        case IOTC_AT_TOKEN:
+            // token type does not need any secret or info
+            break;
+        default:
+            return -1;
+    }
+#endif /* access */
 
     if (config.auth_info.type == IOTC_AT_TPM) {
         if (!config.duid || strlen(config.duid) == 0) {

@@ -133,22 +133,6 @@ static void publish_telemetry() {
 
 
 int main(int argc, char *argv[]) {
-    if (access(IOTCONNECT_SERVER_CERT, F_OK) != 0) {
-        fprintf(stderr, "Unable to access IOTCONNECT_SERVER_CERT. "
-               "Please change directory so that %s can be accessed from the application or update IOTCONNECT_CERT_PATH\n",
-               IOTCONNECT_SERVER_CERT);
-    }
-
-    if (IOTCONNECT_AUTH_TYPE == IOTC_AT_X509) {
-        if (access(IOTCONNECT_IDENTITY_CERT, F_OK) != 0 ||
-            access(IOTCONNECT_IDENTITY_KEY, F_OK) != 0
-                ) {
-            fprintf(stderr, "Unable to access device identity private key and certificate. "
-                   "Please change directory so that %s can be accessed from the application or update IOTCONNECT_CERT_PATH\n",
-                   IOTCONNECT_SERVER_CERT);
-        }
-    }
-
     IotConnectClientConfig *config = iotconnect_sdk_init_and_get_config();
     config->cpid = IOTCONNECT_CPID;
     config->env = IOTCONNECT_ENV;
@@ -174,6 +158,7 @@ int main(int argc, char *argv[]) {
     config->ota_cb = on_ota;
     config->cmd_cb = on_command;
 
+    iotconnect_sdk_dump_configuration();
 
     // run a dozen connect/send/disconnect cycles with each cycle being about a minute
     for (int j = 0; j < 10; j++) {
