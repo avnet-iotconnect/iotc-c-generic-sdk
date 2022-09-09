@@ -132,9 +132,6 @@ static void publish_telemetry() {
 }
 
 
-void iotconnect_sdk_set_config_cpid(char *cpid) {
-}
-
 int main(int argc, char *argv[]) {
     if (access(IOTCONNECT_SERVER_CERT, F_OK) != 0) {
         fprintf(stderr, "Unable to access IOTCONNECT_SERVER_CERT. "
