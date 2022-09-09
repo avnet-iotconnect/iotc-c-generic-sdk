@@ -132,6 +132,9 @@ static void publish_telemetry() {
 }
 
 
+void iotconnect_sdk_set_config_cpid(char *cpid) {
+}
+
 int main(int argc, char *argv[]) {
     IotConnectClientConfig *config = iotconnect_sdk_init_and_get_config();
     config->cpid = IOTCONNECT_CPID;
