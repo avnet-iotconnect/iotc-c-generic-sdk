@@ -316,8 +316,8 @@ int iotconnect_sdk_send_packet(const char *data) {
     return iotc_device_client_send_message(data);
 }
 
-void iotconnect_sdk_receive(void) {
-    iotc_device_client_receive();
+void iotconnect_sdk_receive() {
+    return iotc_device_client_receive();
 }
 
 ///////////////////////////////////////////////////////////////////////////////////
