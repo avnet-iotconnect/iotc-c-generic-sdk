@@ -200,23 +200,23 @@ static void on_mqtt_c2d_message(unsigned char *message, size_t message_len) {
     free(str);
 }
 
-void iotconnect_sdk_disconnect() {
+void iotconnect_sdk_disconnect(void) {
     printf("Disconnecting...\n");
     if (0 == iotc_device_client_disconnect()) {
         printf("Disconnected.\n");
     }
 }
 
-bool iotconnect_sdk_is_connected() {
+bool iotconnect_sdk_is_connected(void) {
     return iotc_device_client_is_connected();
 }
 
-IotConnectClientConfig *iotconnect_sdk_init_and_get_config() {
+IotConnectClientConfig *iotconnect_sdk_init_and_get_config(void) {
     memset(&config, 0, sizeof(config));
     return &config;
 }
 
-IotclConfig *iotconnect_sdk_get_lib_config() {
+IotclConfig *iotconnect_sdk_get_lib_config(void) {
     return iotcl_get_config();
 }
 
@@ -256,13 +256,13 @@ int iotconnect_sdk_send_packet(const char *data) {
     return iotc_device_client_send_message(data);
 }
 
-void iotconnect_sdk_receive() {
+void iotconnect_sdk_receive(void) {
     return iotc_device_client_receive();
 }
 
 ///////////////////////////////////////////////////////////////////////////////////
 // this the Initialization os IoTConnect SDK
-int iotconnect_sdk_init() {
+int iotconnect_sdk_init(void) {
     int ret;
 
     if (config.auth_info.type == IOTC_AT_TPM) {

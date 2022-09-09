@@ -79,7 +79,7 @@ static char *file_to_string(const char *filename) {
     return buffer;
 }
 
-static void client_deinit() {
+static void client_deinit(void) {
     is_client_active = false;
     if (device_ll_handle) {
         IoTHubDeviceClient_LL_DoWork(device_ll_handle);
@@ -151,12 +151,12 @@ connection_status_callback(IOTHUB_CLIENT_CONNECTION_STATUS result, IOTHUB_CLIENT
 }
 
 
-int iotc_device_client_disconnect() {
+int iotc_device_client_disconnect(void) {
     client_deinit();
     return 0;
 }
 
-bool iotc_device_client_is_connected() {
+bool iotc_device_client_is_connected(void) {
     if (!is_client_active) {
         return false;
     }
@@ -196,7 +196,7 @@ int iotc_device_client_send_message(const char *message) {
 }
 
 
-void iotc_device_client_receive() {
+void iotc_device_client_receive(void) {
     if (is_iothub_initialized && device_ll_handle) {
         IoTHubDeviceClient_LL_DoWork(device_ll_handle);
     }
@@ -238,7 +238,7 @@ static void register_device_callback(PROV_DEVICE_RESULT register_result, const c
 }
 
 // returned value needs to be freed
-char* iotc_device_client_get_tpm_registration_id() {
+char* iotc_device_client_get_tpm_registration_id(void) {
     char *ret;
     if (!is_client_active) {
         prov_dev_security_init(SECURE_DEVICE_TYPE_TPM);

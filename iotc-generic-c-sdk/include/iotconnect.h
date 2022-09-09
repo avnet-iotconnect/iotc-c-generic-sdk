@@ -67,25 +67,25 @@ typedef struct {
 } IotConnectClientConfig;
 
 
-IotConnectClientConfig *iotconnect_sdk_init_and_get_config();
+IotConnectClientConfig *iotconnect_sdk_init_and_get_config(void);
 
 // call iotconnect_sdk_init_and_get_config first and configure the SDK before calling iotconnect_sdk_init()
-int iotconnect_sdk_init();
+int iotconnect_sdk_init(void);
 
-bool iotconnect_sdk_is_connected();
+bool iotconnect_sdk_is_connected(void);
 
 // Can be used to pass to telemetry functions
-IotclConfig *iotconnect_sdk_get_lib_config();
+IotclConfig *iotconnect_sdk_get_lib_config(void);
 
 // Will check if there are inbound messages and call adequate callbacks if there are any
 // This is technically not required for the Paho implementation.
-void iotconnect_sdk_receive();
+void iotconnect_sdk_receive(void);
 
 // blocks until sent and returns 0 if successful.
 // data is a null-terminated string
 int iotconnect_sdk_send_packet(const char *data);
 
-void iotconnect_sdk_disconnect();
+void iotconnect_sdk_disconnect(void);
 
 #ifdef __cplusplus
 }

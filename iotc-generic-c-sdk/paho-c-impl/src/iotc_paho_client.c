@@ -15,7 +15,7 @@ static char *publish_topic;
 static IotConnectC2dCallback c2d_msg_cb = NULL; // callback for inbound messages
 static IotConnectStatusCallback status_cb = NULL; // callback for connection status
 
-static void paho_deinit() {
+static void paho_deinit(void) {
     if (client) {
         MQTTClient_destroy(&client);
         client = NULL;
@@ -44,7 +44,7 @@ static void on_connection_lost(void *context, char *cause) {
     paho_deinit();
 }
 
-int iotc_device_client_disconnect() {
+int iotc_device_client_disconnect(void) {
     int rc;
     is_initialized = false;
     if ((rc = MQTTClient_disconnect(client, 10000)) != MQTTCLIENT_SUCCESS) {
@@ -54,11 +54,11 @@ int iotc_device_client_disconnect() {
     return rc;
 }
 
-void iotc_device_client_receive() {
+void iotc_device_client_receive(void) {
     ; // do nothing for paho
 }
 
-bool iotc_device_client_is_connected() {
+bool iotc_device_client_is_connected(void) {
     if (!is_initialized) {
         return false;
     }
@@ -154,7 +154,7 @@ int iotc_device_client_init(IotConnectDeviceClientConfig *c) {
 }
 
 // not supported for PAHO
-char* iotc_device_client_get_tpm_registration_id() {
+char* iotc_device_client_get_tpm_registration_id(void) {
     return NULL;
 }
 
