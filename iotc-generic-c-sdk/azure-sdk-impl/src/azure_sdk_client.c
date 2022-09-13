@@ -322,6 +322,10 @@ int iotc_device_client_init(IotConnectDeviceClientConfig *c) {
                                               + strlen(c->sr->broker.client_id)
                                               + strlen(c->sr->broker.pass)
             );
+            if(!connection_string_buffer) {
+                fprintf(stderr, "malloc() returned NULL\n");
+                return -1;
+            }
             sprintf(connection_string_buffer, IOTC_CONNECTION_STRING_FORMAT_SAS_TOKEN,
                     c->sr->broker.host,
                     c->sr->broker.client_id,
@@ -334,6 +338,10 @@ int iotc_device_client_init(IotConnectDeviceClientConfig *c) {
                                               + strlen(c->sr->broker.host)
                                               + strlen(c->sr->broker.client_id)
             );
+            if(!connection_string_buffer) {
+                fprintf(stderr, "malloc() returned NULL\n");
+                return -1;
+            }
             sprintf(connection_string_buffer, IOTC_CONNECTION_STRING_FORMAT_X509,
                     c->sr->broker.host,
                     c->sr->broker.client_id
@@ -351,6 +359,10 @@ int iotc_device_client_init(IotConnectDeviceClientConfig *c) {
                                               + strlen(c->sr->broker.client_id)
                                               + strlen(c->auth->data.symmetric_key)
             );
+            if(!connection_string_buffer) {
+                fprintf(stderr, "malloc() returned NULL\n");
+                return -1;
+            }
             sprintf(connection_string_buffer, IOTC_CONNECTION_STRING_FORMAT_KEY,
                     c->sr->broker.host,
                     c->sr->broker.client_id,

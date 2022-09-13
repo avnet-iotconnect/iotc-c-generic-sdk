@@ -34,6 +34,10 @@ unsigned char *b64_string_to_buffer(const char *input, unsigned int *len) {
     size_t length = strlen(input);
 
     unsigned char *buffer = malloc(length / 4 * 3 + 5); // extra 5 bytes to be safe
+    if(!buffer) {
+        return NULL;
+    }
+
     b64 = BIO_new(BIO_f_base64());
     BIO_set_flags(b64, BIO_FLAGS_BASE64_NO_NL);
     source = BIO_new_mem_buf(input, length);
@@ -60,6 +64,9 @@ char *b64_buffer_to_string(const unsigned char *input, unsigned int length) {
     BIO_get_mem_ptr(b64, &bptr);
 
     char *buff = (char *) malloc(bptr->length);
+    if(!buff) {
+        return NULL;
+    }
     memcpy(buff, bptr->data, bptr->length - 1);
     buff[bptr->length - 1] = 0;
 
@@ -72,6 +79,9 @@ char *b64_buffer_to_string(const unsigned char *input, unsigned int length) {
 char *uri_encode(const char *uri) {
     const size_t uri_len = strlen(uri);
     char *outbuff = malloc((uri_len * 3) + 1);
+    if(!outbuff) {
+        return NULL;
+    }
 
     char *p = outbuff;
     size_t i = 0;
@@ -102,6 +112,9 @@ char *gen_sas_token(const char *host, const char *cpid, const char *duid, char *
 
     const time_t expiration = time(NULL) + expiry_secs;
     char *resource_uri = malloc(len_resource_uri);
+    if(!resource_uri) {
+        return NULL;
+    }
 
     sprintf(resource_uri, IOTHUB_RESOURCE_URI_FORMAT,
             host,
@@ -112,6 +125,9 @@ char *gen_sas_token(const char *host, const char *cpid, const char *duid, char *
     free(resource_uri);
 
     char *string_to_sign = malloc(strlen(encoded_resource_uri) + 1 /* \n */ + 10 /* epoch time */ + 1 /* NULL */);
+    if(!string_to_sign) {
+        return NULL;
+    }
     sprintf(string_to_sign, IOTHUB_SIGNATURE_STR_FORMAT,
             encoded_resource_uri,
             expiration
@@ -136,6 +152,9 @@ char *gen_sas_token(const char *host, const char *cpid, const char *duid, char *
                              strlen(encoded_b64_digest) +
                              +10 /* unix time */
     );
+    if(!sas_token) {
+        return NULL;
+    }
     sprintf(sas_token, IOTHUB_SAS_TOKEN_FORMAT,
             encoded_resource_uri,
             encoded_b64_digest,
