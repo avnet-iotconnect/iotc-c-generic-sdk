@@ -20,7 +20,6 @@
 #include "azure_prov_client/internal/prov_auth_client.h"
 
 #include "iotconnect.h"
-#include "iotconnect_priv.h"
 #include "iotc_device_client.h"
 
 

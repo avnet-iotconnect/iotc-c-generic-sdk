@@ -133,36 +133,30 @@ static void publish_telemetry() {
 
 
 int main(int argc, char *argv[]) {
-    // set this first so that iotconnect_sdk_set_auth_xxx() routines have this information available
-    iotconnect_sdk_set_auth_type(IOTCONNECT_AUTH_TYPE);
+    IotConnectClientConfig *config = iotconnect_sdk_init_and_get_config();
+    config->cpid = IOTCONNECT_CPID;
+    config->env = IOTCONNECT_ENV;
+    config->duid = IOTCONNECT_DUID;
+    config->auth_info.type = IOTCONNECT_AUTH_TYPE;
+    config->auth_info.trust_store = IOTCONNECT_SERVER_CERT;
 
-    iotconnect_sdk_set_config_cpid(IOTCONNECT_CPID);
-    iotconnect_sdk_set_config_env(IOTCONNECT_ENV);
-    iotconnect_sdk_set_config_duid(IOTCONNECT_DUID);
-    iotconnect_sdk_set_auth_trust_store(IOTCONNECT_SERVER_CERT);
-
-    switch(IOTCONNECT_AUTH_TYPE) {
-        case IOTC_AT_X509:
-            iotconnect_sdk_set_auth_device_cert(IOTCONNECT_IDENTITY_CERT);
-            iotconnect_sdk_set_auth_device_key(IOTCONNECT_IDENTITY_KEY);
-            break;
-        case IOTC_AT_TPM:
-            iotconnect_sdk_set_auth_scope_id(IOTCONNECT_SCOPE_ID);
-            break;
-        case IOTC_AT_SYMMETRIC_KEY:
-            iotconnect_sdk_set_auth_symmetric_key(IOTCONNECT_SYMMETRIC_KEY);
-            break;
-        case IOTC_AT_TOKEN:
-            // token type does not need any secret or info
-            break;
-        default:
-            fprintf(stderr, "IOTCONNECT_AUTH_TYPE is invalid\n");
-            return -1;
+    if (config->auth_info.type == IOTC_AT_X509) {
+        config->auth_info.data.cert_info.device_cert = IOTCONNECT_IDENTITY_CERT;
+        config->auth_info.data.cert_info.device_key = IOTCONNECT_IDENTITY_KEY;
+    } else if (config->auth_info.type == IOTC_AT_TPM) {
+        config->auth_info.data.scope_id = IOTCONNECT_SCOPE_ID;
+    } else if (config->auth_info.type == IOTC_AT_SYMMETRIC_KEY){
+        config->auth_info.data.symmetric_key = IOTCONNECT_SYMMETRIC_KEY;
+    } else if (config->auth_info.type != IOTC_AT_TOKEN) { // token type does not need any secret or info
+        // none of the above
+        fprintf(stderr, "IOTCONNECT_AUTH_TYPE is invalid\n");
+        return -1;
     }
 
-    iotconnect_sdk_set_config_status_cb(on_connection_status);
-    iotconnect_sdk_set_config_ota_cb(on_ota);
-    iotconnect_sdk_set_config_cmd_cb(on_command);
+
+    config->status_cb = on_connection_status;
+    config->ota_cb = on_ota;
+    config->cmd_cb = on_command;
 
     iotconnect_sdk_dump_configuration();
 

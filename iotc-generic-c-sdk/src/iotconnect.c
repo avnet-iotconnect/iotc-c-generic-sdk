@@ -11,7 +11,6 @@
 #endif
 #include "iotconnect_discovery.h"
 #include "iotconnect.h"
-#include "iotconnect_priv.h"
 #include "iotc_http_request.h"
 #include "iotc_device_client.h"
 
@@ -222,133 +221,12 @@ bool iotconnect_sdk_is_connected(void) {
     return iotc_device_client_is_connected();
 }
 
-void iotconnect_sdk_set_auth_type(IotConnectAuthType type) {
-    config.auth_info.type = type;
+IotConnectClientConfig *iotconnect_sdk_init_and_get_config(void) {
+    memset(&config, 0, sizeof(config));
+    return &config;
 }
 
-// not copying the string - relying on it remaining in-scope
-void iotconnect_sdk_set_auth_trust_store(char *trust_store_filename) {
-    config.auth_info.trust_store = trust_store_filename;
-}
-
-// not copying the string - relying on it remaining in-scope
-void iotconnect_sdk_set_auth_device_cert(char *device_cert_filename) {
-    // check auth_type, and warn because union will appear to set other fields
-    if(config.auth_info.type != IOTC_AT_X509) {
-        fprintf(stderr, "iotconnect_sdk_set_auth_type() isn't IOTC_AT_X509\n");
-    }
-    config.auth_info.data.cert_info.device_cert = device_cert_filename;
-}
-
-// not copying the string - relying on it remaining in-scope
-void iotconnect_sdk_set_auth_device_key(char *device_key_filename) {
-    // check auth_type, and warn because union will appear to set other fields
-    if(config.auth_info.type != IOTC_AT_X509) {
-        fprintf(stderr, "iotconnect_sdk_set_auth_type() isn't IOTC_AT_X509\n");
-    }
-    config.auth_info.data.cert_info.device_key = device_key_filename;
-}
-
-// not copying the string - relying on it remaining in-scope
-void iotconnect_sdk_set_auth_symmetric_key(char *symmetric_key) {
-    // check auth_type, and warn because union will appear to set other fields
-    if(config.auth_info.type != IOTC_AT_SYMMETRIC_KEY) {
-        fprintf(stderr, "iotconnect_sdk_set_auth_type() isn't IOTC_AT_SYMMETRIC_KEY\n");
-    }
-    config.auth_info.data.symmetric_key = symmetric_key;
-}
-
-// not copying the string - relying on it remaining in-scope
-void iotconnect_sdk_set_auth_scope_id(char *scope_id) {
-    // check auth_type, and warn because union will appear to set other fields
-    if(config.auth_info.type != IOTC_AT_TPM) {
-        fprintf(stderr, "iotconnect_sdk_set_auth_type() isn't IOTC_AT_TPM\n");
-    }
-    config.auth_info.data.scope_id = scope_id;
-}
-
-//
-// Note any future iotconnect_sdk_get_auth_xxx() routines must consider auth_type, due to the union-nature of the auth_info structure unset fields may become "set".
-//
-
-// not copying the string - relying on it remaining in-scope
-void iotconnect_sdk_set_config_env(char *env) {
-    config.env = env;
-}
-
-// not copying the string - relying on it remaining in-scope
-void iotconnect_sdk_set_config_cpid(char *cpid) {
-    config.cpid = cpid;
-}
-
-// not copying the string - relying on it remaining in-scope
-void iotconnect_sdk_set_config_duid(char *duid) {
-    config.duid = duid;
-}
-
-void iotconnect_sdk_set_config_qos(int qos) {
-    config.qos = qos;
-}
-
-void iotconnect_sdk_set_config_ota_cb(IotclOtaCallback ota_cb) {
-    config.ota_cb = ota_cb;
-}
-
-void iotconnect_sdk_set_config_cmd_cb(IotclCommandCallback cmd_cb) {
-    config.cmd_cb = cmd_cb;
-}
-
-void iotconnect_sdk_set_config_msg_cb(IotclMessageCallback msg_cb) {
-    config.msg_cb = msg_cb;
-}
-
-void iotconnect_sdk_set_config_status_cb(IotConnectStatusCallback status_cb) {
-    config.status_cb = status_cb;
-}
-
-static bool iotconnect_sdk_config_validate() {
-    // FIXME filename checks have TOCTOU issues, but they are what they are...
-
-    if (access(config.auth_info.trust_store, F_OK) != 0) {
-        fprintf(stderr, "Unable to access IOTCONNECT_SERVER_CERT. " // FIXME is this still correct debug?
-               "Please change directory so that %s can be accessed from the application or update IOTCONNECT_CERT_PATH and recompile\n",
-               config.auth_info.trust_store);
-    }
-
-    switch(config.auth_info.type) {
-        case IOTC_AT_X509:
-            if (access(config.auth_info.data.cert_info.device_key, F_OK) != 0) {
-                fprintf(stderr, "Unable to access device identity private key. "
-                        "Please change directory so that %s can be accessed from the application or update IOTCONNECT_CERT_PATH and recompile\n",
-                        config.auth_info.data.cert_info.device_key);
-            }
-
-            if (access(config.auth_info.data.cert_info.device_cert, F_OK) != 0) {
-                fprintf(stderr, "Unable to access device identity certificate. "
-                        "Please change directory so that %s can be accessed from the application or update IOTCONNECT_CERT_PATH and recompile\n",
-                        config.auth_info.data.cert_info.device_cert);
-            }
-            break;
-        case IOTC_AT_TPM:
-            // Not sure how to validate scope_id, non-NULL and non-empty? FIXME
-            break;
-        case IOTC_AT_SYMMETRIC_KEY:
-            // Not sure how to validate symmetric_key, non-NULL and non-empty? FIXME
-            break;
-        case IOTC_AT_TOKEN:
-            // token type does not need any secret or info
-            break;
-        default:
-            fprintf(stderr, "iotconnect_sdk_config_validate type is invalid\n");
-            return -1;
-    }
-
-    return true;
-}
-
-//
 // For debugging
-//
 void iotconnect_sdk_dump_configuration() {
     printf("Settings -> Key Vault -> Environment: %s\n", config.env);
     printf("Settings -> Key Vault -> CPID: %s\n", config.cpid);
@@ -428,9 +306,40 @@ void iotconnect_sdk_receive(void) {
 int iotconnect_sdk_init(void) {
     int ret;
 
-    if(iotconnect_sdk_config_validate() != true) {
-        fprintf(stderr, "iotconnect_sdk_config_validate failed\n");
-        return -1;
+    // FIXME filename checks have TOCTOU issues, but they are what they are...
+    if (access(config.auth_info.trust_store, F_OK) != 0) {
+        fprintf(stderr, "Unable to access IOTCONNECT_SERVER_CERT. " // FIXME is this still correct debug?
+               "Please change directory so that %s can be accessed from the application or update IOTCONNECT_CERT_PATH and recompile\n",
+               config.auth_info.trust_store);
+    }
+
+    switch(config.auth_info.type) {
+        case IOTC_AT_X509:
+            if (access(config.auth_info.data.cert_info.device_key, F_OK) != 0) {
+                fprintf(stderr, "Unable to access device identity private key. "
+                        "Please change directory so that %s can be accessed from the application or update IOTCONNECT_CERT_PATH and recompile\n",
+                        config.auth_info.data.cert_info.device_key);
+                        return -1;
+            }
+
+            if (access(config.auth_info.data.cert_info.device_cert, F_OK) != 0) {
+                fprintf(stderr, "Unable to access device identity certificate. "
+                        "Please change directory so that %s can be accessed from the application or update IOTCONNECT_CERT_PATH and recompile\n",
+                        config.auth_info.data.cert_info.device_cert);
+                        return -1;
+            }
+            break;
+        case IOTC_AT_TPM:
+            // Not sure how to validate scope_id, non-NULL and non-empty? FIXME
+            break;
+        case IOTC_AT_SYMMETRIC_KEY:
+            // Not sure how to validate symmetric_key, non-NULL and non-empty? FIXME
+            break;
+        case IOTC_AT_TOKEN:
+            // token type does not need any secret or info
+            break;
+        default:
+            return -1;
     }
 
     if (config.auth_info.type == IOTC_AT_TPM) {

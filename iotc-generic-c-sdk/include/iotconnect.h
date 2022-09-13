@@ -41,23 +41,34 @@ typedef enum {
 
 typedef void (*IotConnectStatusCallback)(IotConnectConnectionStatus data);
 
-void iotconnect_sdk_set_auth_type(IotConnectAuthType type);
-void iotconnect_sdk_set_auth_trust_store(char *trust_store_filename);
-void iotconnect_sdk_set_auth_device_cert(char *device_cert_filename);
-void iotconnect_sdk_set_auth_device_key(char *device_key_filename);
-void iotconnect_sdk_set_auth_symmetric_key(char *symmetric_key);
-void iotconnect_sdk_set_auth_scope_id(char *scope_id);
+typedef struct {
+    IotConnectAuthType type;
+    char* trust_store; // Path to a file containing the trust certificates for the remote MQTT host
+    union {
+        struct {
+            char* device_cert; // Path to a file containing the device CA cert (or chain) in PEM format
+            char* device_key; // Path to a file containing the device private key in PEM format
+        } cert_info;
+        char *symmetric_key;
+        char *scope_id; // for TPM authentication. AKA: ID Scope
+    } data;
+} IotConnectAuthInfo;
 
-void iotconnect_sdk_set_config_env(char *env);
-void iotconnect_sdk_set_config_cpid(char *cpid);
-void iotconnect_sdk_set_config_duid(char *duid);
-void iotconnect_sdk_set_config_qos(int qos);
-void iotconnect_sdk_set_config_ota_cb(IotclOtaCallback ota_cb);
-void iotconnect_sdk_set_config_cmd_cb(IotclCommandCallback cmd_cb);
-void iotconnect_sdk_set_config_msg_cb(IotclMessageCallback msg_cb);
-void iotconnect_sdk_set_config_status_cb(IotConnectStatusCallback status_cb);
+typedef struct {
+    char *env;    // Settings -> Key Vault -> CPID.
+    char *cpid;   // Settings -> Key Vault -> Evnironment.
+    char *duid;   // Name of the device.
+    int qos; // QOS for outbound messages. Default 1.
+    IotConnectAuthInfo auth_info;
+    IotclOtaCallback ota_cb; // callback for OTA events.
+    IotclCommandCallback cmd_cb; // callback for command events.
+    IotclMessageCallback msg_cb; // callback for ALL messages, including the specific ones like cmd or ota callback.
+    IotConnectStatusCallback status_cb; // callback for connection status
+} IotConnectClientConfig;
 
 void iotconnect_sdk_dump_configuration(void);
+
+IotConnectClientConfig *iotconnect_sdk_init_and_get_config(void);
 
 // call iotconnect_sdk_init_and_get_config first and configure the SDK before calling iotconnect_sdk_init()
 int iotconnect_sdk_init(void);

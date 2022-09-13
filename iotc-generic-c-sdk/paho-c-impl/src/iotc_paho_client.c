@@ -1,7 +1,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include "MQTTClient.h"
-#include "iotconnect_priv.h"
 #include "iotc_device_client.h"
 
 #define HOST_URL_FORMAT "ssl://%s:8883"
