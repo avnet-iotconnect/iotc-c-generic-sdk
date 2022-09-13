@@ -14,7 +14,7 @@ extern   "C" {
 #endif
 
 
-typedef void (*IotConnectC2dCallback)(unsigned char* message, size_t message_len);
+typedef void (*IotConnectC2dCallback)(const unsigned char* message, size_t message_len);
 
 typedef struct {
     int qos; // default QOS is 1
