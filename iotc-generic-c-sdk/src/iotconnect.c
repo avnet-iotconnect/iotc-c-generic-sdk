@@ -245,7 +245,7 @@ IotConnectClientConfig *iotconnect_sdk_init_and_get_config(void) {
 // For debugging
 void iotconnect_sdk_dump_configuration() {
     printf("Settings -> Key Vault -> Environment: %s\n", config.env);
-    printf("Settings -> Key Vault -> CPID: %s\n", config.cpid);
+    printf("Settings -> Key Vault -> CPID: %.4s\n", config.cpid);
     printf("Name of the device: %s\n", config.duid);
     printf("QoS: %d\n", config.qos);
     printf("Callback for OTA events: %p\n", config.ota_cb);
