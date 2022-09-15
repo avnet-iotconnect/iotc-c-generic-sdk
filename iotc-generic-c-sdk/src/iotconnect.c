@@ -47,7 +47,7 @@ static void dump_response(const char *message, IotConnectHttpResponse *response)
     }
 }
 
-static void report_sync_error(IotclSyncResponse *response, const char *sync_response_str) {
+static void report_sync_error(const IotclSyncResponse *response, const char *sync_response_str) {
     if (NULL == response) {
         fprintf(stderr, "Failed to obtain sync response?\n");
         return;
@@ -110,7 +110,7 @@ static IotclDiscoveryResponse *run_http_discovery(const char *cpid, const char *
         dump_response("Unable to parse HTTP response,", &response);
         goto cleanup;
     }
-    char *json_start = strstr(response.data, "{");
+    const char *json_start = strstr(response.data, "{");
     if (NULL == json_start) {
         dump_response("No json response from server.", &response);
         goto cleanup;
@@ -125,6 +125,7 @@ static IotclDiscoveryResponse *run_http_discovery(const char *cpid, const char *
     }
 
     cleanup:
+    free(url_buff);
     iotconnect_free_https_response(&response);
     // fall through
     return ret;
@@ -169,7 +170,7 @@ static IotclSyncResponse *run_http_sync(const char *cpid, const char *uniqueid) 
         dump_response("Unable to parse HTTP response.", &response);
         goto cleanup;
     }
-    char *json_start = strstr(response.data, "{");
+    const char *json_start = strstr(response.data, "{");
     if (NULL == json_start) {
         dump_response("No json response from server.", &response);
         goto cleanup;
@@ -199,7 +200,7 @@ static IotclSyncResponse *run_http_sync(const char *cpid, const char *uniqueid) 
     return ret;
 }
 
-static void on_mqtt_c2d_message(unsigned char *message, size_t message_len) {
+static void on_mqtt_c2d_message(const unsigned char *message, size_t message_len) {
     char *str = malloc(message_len + 1);
     memcpy(str, message, message_len);
     str[message_len] = 0;
@@ -280,10 +281,13 @@ static void on_message_intercept(IotclEventData data, IotConnectEventType type) 
             }
             printf("Got ON_FORCE_SYNC. Disconnecting.\n");
             iotconnect_sdk_disconnect(); // client will get notification that we disconnected and will reinit
+            break;
 
         case ON_CLOSE:
-            printf("Got a disconnect request. Closing the mqtt connection. Device restart is required.\n");
+            printf("Got ON_CLOSE. Closing the mqtt connection. Device restart is required.\n");
             iotconnect_sdk_disconnect();
+            break;
+
         default:
             break; // not handling nay other messages
     }
@@ -447,7 +451,7 @@ int iotconnect_sdk_init(void) {
     pc.sr = sync_response;
     pc.qos = config.qos;
     pc.status_cb = config.status_cb;
-    pc.c2d_msg_cb = on_mqtt_c2d_message;
+    pc.c2d_msg_cb = &on_mqtt_c2d_message;
     pc.auth = &config.auth_info;
 
     ret = iotc_device_client_init(&pc);
