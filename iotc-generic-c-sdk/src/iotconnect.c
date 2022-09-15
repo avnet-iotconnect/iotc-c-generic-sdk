@@ -96,6 +96,11 @@ static IotclDiscoveryResponse *run_http_discovery(const char *cpid, const char *
                             strlen(env) - 4 /* %s x 2 */
     );
 
+    if(!url_buff) {
+        fprintf(stderr, "Unable to allocate memory");
+        return NULL;
+    }
+
     sprintf(url_buff, HTTP_DISCOVERY_URL_FORMAT,
             IOTCONNECT_DISCOVERY_HOSTNAME, cpid, env
     );
@@ -184,6 +189,11 @@ static IotclSyncResponse *run_http_sync(const char *cpid, const char *uniqueid) 
         if (config.auth_info.type == IOTC_AT_TPM && ret && ret->ds == IOTCL_SR_DEVICE_NOT_REGISTERED) {
             // malloc below will be freed when we iotcl_discovery_free_sync_response
             ret->broker.client_id = malloc(strlen(uniqueid) + 1 /* - */ + strlen(cpid) + 1);
+            if(!ret->broker.client_id) {
+                dump_response("Unable to allocate memory,", &response);
+                goto cleanup;
+            }
+
             sprintf(ret->broker.client_id, "%s-%s", cpid, uniqueid);
             printf("TPM Device is not yet enrolled. Enrolling...\n");
         } else {
@@ -202,6 +212,11 @@ static IotclSyncResponse *run_http_sync(const char *cpid, const char *uniqueid) 
 
 static void on_mqtt_c2d_message(const unsigned char *message, size_t message_len) {
     char *str = malloc(message_len + 1);
+    if(!str) {
+        fprintf(stderr, "Unable to allocate memory\n");
+        return;
+    }
+
     memcpy(str, message, message_len);
     str[message_len] = 0;
     printf("event>>> %s\n", str);
