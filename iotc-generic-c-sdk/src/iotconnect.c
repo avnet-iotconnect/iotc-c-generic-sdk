@@ -16,13 +16,10 @@
 
 // windows compatibility
 #if defined(_WIN32) || defined(_WIN64)
-
-#ifdef _access_s
 #define F_OK 0
 #include <Windows.h>
 #include <io.h>
 #define access    _access_s
-#endif /* _access_s */
 
 #else
 #include <unistd.h>
@@ -329,27 +326,26 @@ void iotconnect_sdk_receive(void) {
 int iotconnect_sdk_init(void) {
     int ret;
 
-// Double-check that an access() function is defined.
-#ifdef access
     // Obviously filename checks have TOCTOU issues, but they are what they are...
     if (access(config.auth_info.trust_store, F_OK) != 0) {
-        fprintf(stderr, "Unable to access IOTCONNECT_SERVER_CERT. " // FIXME is this still correct debug?
-               "Please change directory so that %s can be accessed from the application or update IOTCONNECT_CERT_PATH and recompile\n",
+        fprintf(stderr, "Unable to access IOTCONNECT_SERVER_CERT. "
+               "Please change directory so that %s can be accessed from the application or update IOTCONNECT_SERVER_CERT / IOTCONNECT_CERT_PATH and recompile\n",
                config.auth_info.trust_store);
+               return -1;
     }
 
     switch(config.auth_info.type) {
         case IOTC_AT_X509:
             if (access(config.auth_info.data.cert_info.device_key, F_OK) != 0) {
                 fprintf(stderr, "Unable to access device identity private key. "
-                        "Please change directory so that %s can be accessed from the application or update IOTCONNECT_CERT_PATH and recompile\n",
+                        "Please change directory so that %s can be accessed from the application or update IOTCONNECT_IDENTITY_KEY / IOTCONNECT_CERT_PATH and recompile\n",
                         config.auth_info.data.cert_info.device_key);
                         return -1;
             }
 
             if (access(config.auth_info.data.cert_info.device_cert, F_OK) != 0) {
                 fprintf(stderr, "Unable to access device identity certificate. "
-                        "Please change directory so that %s can be accessed from the application or update IOTCONNECT_CERT_PATH and recompile\n",
+                        "Please change directory so that %s can be accessed from the application or update IOTCONNECT_IDENTITY_CERT / IOTCONNECT_CERT_PATH and recompile\n",
                         config.auth_info.data.cert_info.device_cert);
                         return -1;
             }
@@ -366,7 +362,6 @@ int iotconnect_sdk_init(void) {
         default:
             return -1;
     }
-#endif /* access */
 
     if (config.auth_info.type == IOTC_AT_TPM) {
         if (!config.duid || strlen(config.duid) == 0) {
