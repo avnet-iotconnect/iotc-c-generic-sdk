@@ -126,6 +126,7 @@ char *gen_sas_token(const char *host, const char *cpid, const char *duid, char *
 
     char *string_to_sign = malloc(strlen(encoded_resource_uri) + 1 /* \n */ + 10 /* epoch time */ + 1 /* NULL */);
     if(!string_to_sign) {
+        free(encoded_resource_uri);
         return NULL;
     }
     sprintf(string_to_sign, IOTHUB_SIGNATURE_STR_FORMAT,
@@ -153,6 +154,8 @@ char *gen_sas_token(const char *host, const char *cpid, const char *duid, char *
                              +10 /* unix time */
     );
     if(!sas_token) {
+        free(encoded_resource_uri);
+        free(encoded_b64_digest);
         return NULL;
     }
     sprintf(sas_token, IOTHUB_SAS_TOKEN_FORMAT,
