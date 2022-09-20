@@ -106,6 +106,10 @@ static void send_confirm_callback(IOTHUB_CLIENT_CONFIRMATION_RESULT result, void
 }
 
 static IOTHUBMESSAGE_DISPOSITION_RESULT receive_msg_callback(IOTHUB_MESSAGE_HANDLE message, void *user_context) {
+    if (!c2d_msg_cb) {
+        return IOTHUBMESSAGE_ACCEPTED;
+    }
+
     (void) user_context;
     is_inside_callback = true;
     IOTHUBMESSAGE_CONTENT_TYPE content_type = IoTHubMessage_GetContentType(message);
@@ -116,16 +120,13 @@ static IOTHUBMESSAGE_DISPOSITION_RESULT receive_msg_callback(IOTHUB_MESSAGE_HAND
         if (IoTHubMessage_GetByteArray(message, &buff_msg, &buff_len) != IOTHUB_MESSAGE_OK) {
             fprintf(stderr, "Error: Unable to extract c2d message from IoTHub.\n");
         } else {
-            if (c2d_msg_cb) {
-                c2d_msg_cb((unsigned char *) buff_msg, buff_len);
-            }
+            c2d_msg_cb((unsigned char *) buff_msg, buff_len);
         }
     } else {
         const char *string_msg = IoTHubMessage_GetString(message);
         if (string_msg == NULL) {
             fprintf(stderr, "Error: Unable to extract c2d message from IoTHub.\n");
-        }
-        if (c2d_msg_cb) {
+        } else {
             c2d_msg_cb((unsigned char *) string_msg, strlen(string_msg));
         }
     }
