@@ -332,6 +332,7 @@ int iotconnect_sdk_init(void) {
 
     if (config.auth_info.type != IOTC_AT_TOKEN &&
         config.auth_info.type != IOTC_AT_X509 &&
+        config.auth_info.type != IOTC_AT_SELF_SIGNED &&
         config.auth_info.type != IOTC_AT_TPM &&
         config.auth_info.type != IOTC_AT_SYMMETRIC_KEY
         ) {
@@ -343,7 +344,7 @@ int iotconnect_sdk_init(void) {
         fprintf(stderr, "Error: Configuration server certificate is required.\n");
         return -1;
     }
-    if (config.auth_info.type == IOTC_AT_X509 && (
+    if ((config.auth_info.type == IOTC_AT_X509 || config.auth_info.type == IOTC_AT_SELF_SIGNED) && (
             !config.auth_info.data.cert_info.device_cert ||
             !config.auth_info.data.cert_info.device_key)) {
         fprintf(stderr, "Error: Configuration authentication info is invalid.\n");

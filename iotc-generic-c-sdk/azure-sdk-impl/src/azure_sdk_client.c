@@ -337,7 +337,8 @@ int iotc_device_client_init(IotConnectDeviceClientConfig *c) {
             );
             break;
 
-        case IOTC_AT_X509:
+        case IOTC_AT_X509: /* fallthrough */
+        case IOTC_AT_SELF_SIGNED:
             connection_string_buffer = malloc(sizeof(IOTC_CONNECTION_STRING_FORMAT_X509)
                                               + strlen(c->sr->broker.host)
                                               + strlen(c->sr->broker.client_id)
@@ -389,7 +390,7 @@ int iotc_device_client_init(IotConnectDeviceClientConfig *c) {
         return -1;
     }
 
-    if (c->auth->type == IOTC_AT_X509) {
+    if (c->auth->type == IOTC_AT_X509 || c->auth->type == IOTC_AT_SELF_SIGNED) {
         char *device_cert = file_to_string(c->auth->data.cert_info.device_cert);
         char *device_key = file_to_string(c->auth->data.cert_info.device_key);
         if (

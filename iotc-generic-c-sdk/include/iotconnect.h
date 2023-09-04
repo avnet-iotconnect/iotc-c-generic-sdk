@@ -22,8 +22,11 @@ typedef enum {
     // and must not be used in production
     IOTC_AT_TOKEN = 1,
 
-    // CA Cert and Self Signed Cert
+    // CA Cert
     IOTC_AT_X509 = 2,
+
+    // Self Signed Cert
+    IOTC_AT_SELF_SIGNED = 3, // 3 for compatibility with sync
 
     // TPM hardware devices
     IOTC_AT_TPM = 4, // 4 for compatibility with sync

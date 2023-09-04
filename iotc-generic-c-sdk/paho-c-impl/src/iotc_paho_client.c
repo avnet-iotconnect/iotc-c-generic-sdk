@@ -123,7 +123,7 @@ int iotc_device_client_init(IotConnectDeviceClientConfig *c) {
 
     ssl_opts.verify = 1;
     ssl_opts.trustStore = c->auth->trust_store;
-    if (c->auth->type == IOTC_AT_X509) {
+    if (c->auth->type == IOTC_AT_X509 || c->auth->type == IOTC_AT_SELF_SIGNED) {
         ssl_opts.keyStore = c->auth->data.cert_info.device_cert;
         ssl_opts.privateKey = c->auth->data.cert_info.device_key;
     }

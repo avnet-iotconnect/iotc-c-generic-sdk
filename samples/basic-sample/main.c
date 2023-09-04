@@ -139,7 +139,7 @@ int main(int argc, char *argv[]) {
                IOTCONNECT_SERVER_CERT);
     }
 
-    if (IOTCONNECT_AUTH_TYPE == IOTC_AT_X509) {
+    if (IOTCONNECT_AUTH_TYPE == IOTC_AT_X509 || IOTCONNECT_AUTH_TYPE == IOTC_AT_SELF_SIGNED) {
         if (access(IOTCONNECT_IDENTITY_CERT, F_OK) != 0 ||
             access(IOTCONNECT_IDENTITY_KEY, F_OK) != 0
                 ) {
@@ -156,7 +156,7 @@ int main(int argc, char *argv[]) {
     config->auth_info.type = IOTCONNECT_AUTH_TYPE;
     config->auth_info.trust_store = IOTCONNECT_SERVER_CERT;
 
-    if (config->auth_info.type == IOTC_AT_X509) {
+    if (config->auth_info.type == IOTC_AT_X509 || IOTCONNECT_AUTH_TYPE == IOTC_AT_SELF_SIGNED) {
         config->auth_info.data.cert_info.device_cert = IOTCONNECT_IDENTITY_CERT;
         config->auth_info.data.cert_info.device_key = IOTCONNECT_IDENTITY_KEY;
     } else if (config->auth_info.type == IOTC_AT_TPM) {
