@@ -50,10 +50,34 @@ static void command_status(IotclEventData data, bool status, const char *command
     free((void *) ack);
 }
 
+// really for debugging/testing -- this sends the last "echo" command received -- almost a copy of publish_telemetry()
+static void publish_echo_command(const char *last_command) {
+    IotclMessageHandle msg = iotcl_telemetry_create();
+
+    // Optional. The first time you create a data point, the current timestamp will be automatically added
+    // TelemetryAddWith* calls are only required if sending multiple data points in one packet.
+    iotcl_telemetry_add_with_iso_time(msg, iotcl_iso_timestamp_now());
+    iotcl_telemetry_set_string(msg, "last-command", last_command);
+
+    const char *str = iotcl_create_serialized_string(msg, false);
+    iotcl_telemetry_destroy(msg);
+    printf("Sending: %s\n", str);
+    iotconnect_sdk_send_packet(str); // underlying code will report an error
+    iotcl_destroy_serialized(str);
+}
+
+#define ECHO_COMMAND "echo "
 static void on_command(IotclEventData data) {
     char *command = iotcl_clone_command(data);
     if (NULL != command) {
-        command_status(data, false, command, "Not implemented");
+        // the echo command is published as a last_command device attribute
+        printf("on_command() received: %s", command);
+        if(strncmp(command, ECHO_COMMAND, strlen(ECHO_COMMAND)) == 0) {
+            publish_echo_command(command);
+            command_status(data, true, command, "Success");
+        } else {
+            command_status(data, false, command, "Not implemented");
+        }
         free((void *) command);
     } else {
         command_status(data, false, "?", "Internal error");
@@ -78,11 +102,11 @@ static void on_ota(IotclEventData data) {
         if (is_app_version_same_as_ota(version)) {
             printf("OTA request for same version %s. Sending success\n", version);
             success = true;
-            message = "Version is matching";
+            message = "OTA: Version is matching";
         } else if (app_needs_ota_update(version)) {
             printf("OTA update is required for version %s.\n", version);
             success = false;
-            message = "Not implemented";
+            message = "OTA: Not implemented";
         } else {
             printf("Device firmware version %s is newer than OTA version %s. Sending failure\n", APP_VERSION,
                    version);
@@ -90,7 +114,7 @@ static void on_ota(IotclEventData data) {
             // Probably a development version, so return failure?
             // The user should decide here.
             success = false;
-            message = "Device firmware version is newer";
+            message = "OTA: Device firmware version is newer";
         }
 
         free((void *) url);
@@ -102,7 +126,7 @@ static void on_ota(IotclEventData data) {
         if (NULL != command) {
             // URL will be inside the command
             printf("Command is: %s\n", command);
-            message = "Old back end URLS are not supported by the app";
+            message = "OTA: Old back end URLS are not supported by the app";
             free((void *) command);
         }
     }
@@ -112,6 +136,8 @@ static void on_ota(IotclEventData data) {
         iotconnect_sdk_send_packet(ack);
         free((void *) ack);
     }
+
+    publish_echo_command(message);
 }
 
 
