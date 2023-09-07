@@ -14,7 +14,11 @@
 #include "iotc_http_request.h"
 #include "iotc_device_client.h"
 
+#if 0
 #define HTTP_DISCOVERY_URL_FORMAT "https://%s/api/sdk/cpid/%s/lang/M_C/ver/2.0/env/%s"
+#else
+#define HTTP_DISCOVERY_URL_FORMAT "https://%s/api/v2.1/dsdk/cpid/%s/env/%s"
+#endif
 #define HTTP_SYNC_URL_FORMAT "https://%s%ssync?"
 
 static IotclConfig lib_config = {0};
@@ -97,6 +101,8 @@ static IotclDiscoveryResponse *run_http_discovery(const char *discovery_host, co
     sprintf(url_buff, HTTP_DISCOVERY_URL_FORMAT,
             host, cpid, env
     );
+
+    printf("url_buff: %s\n", url_buff);
 
     IotConnectHttpResponse response;
     iotconnect_https_request(&response,

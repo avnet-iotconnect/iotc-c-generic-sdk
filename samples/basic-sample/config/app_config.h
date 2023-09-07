@@ -7,12 +7,23 @@
 
 #include "iotconnect.h"
 
+#if 0
 #define IOTCONNECT_CPID "avtds"
 #define IOTCONNECT_ENV  "avnetpoc"
 
 // Device Unique ID
 // If using TPM, and this value is a blank string, Registration ID will be used from output of tpm_device_provision. Otherwise, the provide Device Uinque ID will be used.
 #define IOTCONNECT_DUID "selfsignedv1"
+#else
+#define IOTCONNECT_CPID  "97FF86E8728645E9B89F7B07977E4B15"
+#define IOTCONNECT_ENV "poc"
+
+#define IOTCONNECT_DISCOVERY_HOSTNAME "awsdiscovery.iotconnect.io"
+
+// Device Unique ID
+// If using TPM, and this value is a blank string, Registration ID will be used from output of tpm_device_provision. Otherwise, the provide Device Uinque ID will be used.
+#define IOTCONNECT_DUID "ssigned21"
+#endif
 
 // from iotconnect.h IotConnectAuthType
 #define IOTCONNECT_AUTH_TYPE IOTC_AT_X509
