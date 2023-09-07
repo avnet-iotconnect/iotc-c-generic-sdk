@@ -16,6 +16,41 @@
 extern "C" {
 #endif
 
+// Probably unused??
+#if 0
+///////////////////////////////////////////////////////////////////////////////////
+// you need to pass cpid , env and the HOST at GET_TEMPLATE
+// This templates can be used for raw HTTP headers in case that the platform doesn't GET/POST functionality
+#define IOTCONNECT_DISCOVERY_HEADER_TEMPLATE \
+    "GET /api/sdk/cpid/%s/lang/M_C/ver/2.0/env/%s HTTP/1.1\r\n" \
+    "Host: " IOTCONNECT_DISCOVERY_HOSTNAME "\r\n" \
+    "Connection: close\r\n" \
+    "\r\n"
+
+///////////////////////////////////////////////////////////////////////////////
+// This templates can be used for raw HTTP headers in case that the platform doesn't GET/POST functionality
+// you need to pass URL returned from discovery host ,host form discovery host, post_data_lan and post_data
+#define IOTCONNECT_SYNC_HEADER_TEMPLATE \
+    "POST %s/sync? HTTP/1.1\r\n" \
+    "Host: %s\r\n" \
+    "Content-Type: application/json; charset=utf-8\r\n" \
+    "Connection: close\r\n" \
+    "Content-length: %d\r\n" \
+    "\r\n" \
+    "%s"
+#endif
+
+// You will typically use this JSON post data to get mqtt client information
+#define IOTCONNECT_DISCOVERY_PROTOCOL_POST_DATA_TEMPLATE "{\"cpId\":\"%s\",\"uniqueId\":\"%s\",\"option\":{\"attribute\":false,\"setting\":false,\"protocol\":true,\"device\":false,\"sdkConfig\":false,\"rule\":false}}"
+
+// add 1 for string terminator
+#define IOTCONNECT_DISCOVERY_PROTOCOL_POST_DATA_MAX_LEN (\
+    sizeof(IOTCONNECT_DISCOVERY_PROTOCOL_POST_DATA_TEMPLATE) + \
+    CONFIG_IOTCONNECT_DUID_MAX_LEN + CONFIG_IOTCONNECT_CPID_MAX_LEN \
+    )
+
+#define DEFAULT_IOTCONNECT_DISCOVERY_HOSTNAME "discovery.iotconnect.io"
+
 typedef enum {
     // Authentication based on your CPID. Sync HTTP endpoint returns a long lived SAS token
     // This auth type is only intended as a simple way to connect your test and development devices
@@ -55,8 +90,9 @@ typedef struct {
 } IotConnectAuthInfo;
 
 typedef struct {
-    char *env;    // Settings -> Key Vault -> CPID.
-    char *cpid;   // Settings -> Key Vault -> Evnironment.
+    const char *discovery_host;    // Settings -> Key Vault -> Discovery Host.
+    char *env;    // Settings -> Key Vault -> Environment.
+    char *cpid;   // Settings -> Key Vault -> CPID.
     char *duid;   // Name of the device.
     int qos; // QOS for outbound messages. Default 1.
     IotConnectAuthInfo auth_info;

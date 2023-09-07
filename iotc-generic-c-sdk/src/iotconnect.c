@@ -78,10 +78,13 @@ static void report_sync_error(const IotclSyncResponse *response, const char *syn
     fprintf(stderr, "Raw server response was:\n--------------\n%s\n--------------\n", sync_response_str);
 }
 
-static IotclDiscoveryResponse *run_http_discovery(const char *cpid, const char *env) {
+static IotclDiscoveryResponse *run_http_discovery(const char *discovery_host, const char *cpid, const char *env) {
+    // for backwards compatibility check for NULL
+    const char *host = (discovery_host == NULL) ? DEFAULT_IOTCONNECT_DISCOVERY_HOSTNAME : discovery_host;
     IotclDiscoveryResponse *ret = NULL;
+
     char *url_buff = malloc(sizeof(HTTP_DISCOVERY_URL_FORMAT) +
-                            sizeof(IOTCONNECT_DISCOVERY_HOSTNAME) +
+                            strlen(host) +
                             strlen(cpid) +
                             strlen(env) - 4 /* %s x 2 */
     );
@@ -92,7 +95,7 @@ static IotclDiscoveryResponse *run_http_discovery(const char *cpid, const char *
     }
 
     sprintf(url_buff, HTTP_DISCOVERY_URL_FORMAT,
-            IOTCONNECT_DISCOVERY_HOSTNAME, cpid, env
+            host, cpid, env
     );
 
     IotConnectHttpResponse response;
@@ -117,6 +120,7 @@ static IotclDiscoveryResponse *run_http_discovery(const char *cpid, const char *
     ret = iotcl_discovery_parse_discovery_response(json_start);
     if (!ret) {
         fprintf(stderr, "Error: Unable to get discovery response for environment \"%s\". Please check the environment name in the key vault.\n", env);
+        printf("json_start: %s\n", json_start);
     }
 
     cleanup:
@@ -239,7 +243,7 @@ static void on_message_intercept(IotclEventData data, IotConnectEventType type) 
             iotcl_discovery_free_discovery_response(discovery_response);
             iotcl_discovery_free_sync_response(sync_response);
             sync_response = NULL;
-            discovery_response = run_http_discovery(config.cpid, config.env);
+            discovery_response = run_http_discovery(config.discovery_host, config.cpid, config.env);
             if (NULL == discovery_response) {
                 fprintf(stderr, "Unable to run HTTP discovery on ON_FORCE_SYNC\n");
                 return;
@@ -290,7 +294,7 @@ int iotconnect_sdk_init(void) {
     }
 
     if (!discovery_response) {
-        discovery_response = run_http_discovery(config.cpid, config.env);
+        discovery_response = run_http_discovery(config.discovery_host, config.cpid, config.env);
         if (NULL == discovery_response) {
             // get_base_url will print the error
             return -1;
@@ -326,6 +330,7 @@ int iotconnect_sdk_init(void) {
     char cpid_buff[5];
     strncpy(cpid_buff, config.cpid, 4);
     cpid_buff[4] = 0;
+    printf("DISCOVERY HOST: %s\n", config.discovery_host ? config.discovery_host : "(default)" );
     printf("CPID: %s***\n", cpid_buff);
     printf("ENV:  %s\n", config.env);
 
