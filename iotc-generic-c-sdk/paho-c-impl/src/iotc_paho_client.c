@@ -88,21 +88,23 @@ int iotc_device_client_send_message(const char *message) {
 }
 
 int iotc_device_client_init(IotConnectDeviceClientConfig *c) {
+    printf("%s / %s\n", __FILE__, __func__);
+
     MQTTClient_connectOptions conn_opts = MQTTClient_connectOptions_initializer;
     MQTTClient_SSLOptions ssl_opts = MQTTClient_SSLOptions_initializer;
     int rc;
 
     paho_deinit(); // reset all locals
 
-    publish_topic = strdup(c->sr->broker.pub_topic);
+    publish_topic = strdup(c->sr->broker.topics.pub_topic);
     if (!publish_topic) {
-        fprintf(stderr, "ERROR: Unable to allocate memory for paho host URL!");
+        printf("ERROR: Unable to allocate memory for paho host URL!\n");
         return -1;
     }
 
     char *paho_host_url = malloc(sizeof(HOST_URL_FORMAT) - 2 + strlen(c->sr->broker.host));
     if (NULL == paho_host_url) {
-        fprintf(stderr,"ERROR: Unable to allocate memory for paho host URL!");
+        printf("ERROR: Unable to allocate memory for paho host URL!\n");
         return -1;
     }
     sprintf(paho_host_url, HOST_URL_FORMAT, c->sr->broker.host);
@@ -116,7 +118,7 @@ int iotc_device_client_init(IotConnectDeviceClientConfig *c) {
     free(paho_host_url);
 
     if ((rc = MQTTClient_setCallbacks(client, NULL, on_connection_lost, on_c2d_message, NULL)) != MQTTCLIENT_SUCCESS) {
-        fprintf(stderr,"Failed to set callbacks, return code %d\n", rc);
+        printf("Failed to set callbacks, return code %d\n", rc);
         paho_deinit();
         return rc;
     }
@@ -133,15 +135,15 @@ int iotc_device_client_init(IotConnectDeviceClientConfig *c) {
     conn_opts.username = c->sr->broker.user_name;
     conn_opts.password = c->sr->broker.pass;
     if ((rc = MQTTClient_connect(client, &conn_opts)) != MQTTCLIENT_SUCCESS) {
-        printf("Failed to connect, return code %d\n", rc);
+        printf("MQTTClient_connect() Failed to connect, return code %d\n", rc);
         paho_deinit();
         return rc;
     }
 
     is_initialized = true; // even if we fail below, we are ok
 
-    if ((rc = MQTTClient_subscribe(client, c->sr->broker.sub_topic, 1)) != MQTTCLIENT_SUCCESS) {
-        printf("Failed to subscribe to c2d topic, return code %d\n", rc);
+    if ((rc = MQTTClient_subscribe(client, c->sr->broker.topics.sub_topic, 1)) != MQTTCLIENT_SUCCESS) {
+        printf("MQTTClient_subscribe() Failed to subscribe to c2d topic, return code %d\n", rc);
         rc = -2;
     }
     c2d_msg_cb = c->c2d_msg_cb;

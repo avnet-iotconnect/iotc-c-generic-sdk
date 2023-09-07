@@ -14,8 +14,13 @@
 #include "iotc_http_request.h"
 #include "iotc_device_client.h"
 
+#ifdef AZURE
 #define HTTP_DISCOVERY_URL_FORMAT "https://%s/api/sdk/cpid/%s/lang/M_C/ver/2.0/env/%s"
 #define HTTP_SYNC_URL_FORMAT "https://%s%ssync?"
+#else
+#define HTTP_DISCOVERY_URL_FORMAT "https://%s/api/v2.1/dsdk/cpid/%s/env/%s"
+#define HTTP_SYNC_URL_FORMAT "https://%s%s/uid/%s"
+#endif
 
 static IotclConfig lib_config = {0};
 static IotConnectClientConfig config = {0};
@@ -37,12 +42,8 @@ static void dump_response(const char *message, IotConnectHttpResponse *response)
     }
 }
 
-static void report_sync_error(const IotclSyncResponse *response, const char *sync_response_str) {
-    if (NULL == response) {
-        fprintf(stderr, "Failed to obtain sync response?\n");
-        return;
-    }
-    switch (response->ds) {
+static void report_sync_error(int ds, const char *sync_response_str) {
+    switch (ds) {
         case IOTCL_SR_DEVICE_NOT_REGISTERED:
             fprintf(stderr, "IOTC_SyncResponse error: Not registered\n");
             break;
@@ -78,10 +79,13 @@ static void report_sync_error(const IotclSyncResponse *response, const char *syn
     fprintf(stderr, "Raw server response was:\n--------------\n%s\n--------------\n", sync_response_str);
 }
 
-static IotclDiscoveryResponse *run_http_discovery(const char *cpid, const char *env) {
+static IotclDiscoveryResponse *run_http_discovery(const char *discovery_host, const char *cpid, const char *env) {
+    // for backwards compatibility check for NULL
+    const char *host = (discovery_host == NULL) ? DEFAULT_IOTCONNECT_DISCOVERY_HOSTNAME : discovery_host;
     IotclDiscoveryResponse *ret = NULL;
+
     char *url_buff = malloc(sizeof(HTTP_DISCOVERY_URL_FORMAT) +
-                            sizeof(IOTCONNECT_DISCOVERY_HOSTNAME) +
+                            strlen(host) +
                             strlen(cpid) +
                             strlen(env) - 4 /* %s x 2 */
     );
@@ -92,14 +96,15 @@ static IotclDiscoveryResponse *run_http_discovery(const char *cpid, const char *
     }
 
     sprintf(url_buff, HTTP_DISCOVERY_URL_FORMAT,
-            IOTCONNECT_DISCOVERY_HOSTNAME, cpid, env
+            host, cpid, env
     );
+
+    printf("url_buff: %s\n", url_buff);
 
     IotConnectHttpResponse response;
     iotconnect_https_request(&response,
                              url_buff,
-                             NULL
-    );
+                             NULL);
 
     if (NULL == response.data) {
         dump_response("Unable to parse HTTP response,", &response);
@@ -116,10 +121,11 @@ static IotclDiscoveryResponse *run_http_discovery(const char *cpid, const char *
 
     ret = iotcl_discovery_parse_discovery_response(json_start);
     if (!ret) {
-        fprintf(stderr, "Error: Unable to get discovery response for environment \"%s\". Please check the environment name in the key vault.\n", env);
+        fprintf(stderr, "%s Error: Unable to get discovery response for environment \"%s\". Please check the environment name in the key vault.\n", __func__, env);
+        printf("json_start: %s\n", json_start);
     }
 
-    cleanup:
+cleanup:
     free(url_buff);
     iotconnect_free_https_response(&response);
     // fall through
@@ -128,16 +134,13 @@ static IotclDiscoveryResponse *run_http_discovery(const char *cpid, const char *
 
 static IotclSyncResponse *run_http_sync(const char *cpid, const char *uniqueid) {
     IotclSyncResponse *ret = NULL;
+#ifdef AZURE
     char *url_buff = malloc(sizeof(HTTP_SYNC_URL_FORMAT) +
                             strlen(discovery_response->host) +
                             strlen(discovery_response->path)
     );
-    char *post_data = malloc(IOTCONNECT_DISCOVERY_PROTOCOL_POST_DATA_MAX_LEN + 1);
-
-    if (!url_buff || !post_data) {
+    if (!url_buff) {
         fprintf(stderr, "run_http_sync: Out of memory!");
-        free(url_buff); // one of them could have succeeded
-        free(post_data);
         return NULL;
     }
 
@@ -145,12 +148,41 @@ static IotclSyncResponse *run_http_sync(const char *cpid, const char *uniqueid) 
             discovery_response->host,
             discovery_response->path
     );
+
+    char *post_data = malloc(IOTCONNECT_DISCOVERY_PROTOCOL_POST_DATA_MAX_LEN + 1);
+    if (!post_data) {
+        fprintf(stderr, "run_http_sync: Out of memory!");
+        free(url_buff);
+        return NULL;
+    }
+
     snprintf(post_data,
              IOTCONNECT_DISCOVERY_PROTOCOL_POST_DATA_MAX_LEN, /*total length should not exceed MTU size*/
              IOTCONNECT_DISCOVERY_PROTOCOL_POST_DATA_TEMPLATE,
              cpid,
              uniqueid
     );
+#else
+    char *url_buff = malloc(sizeof(HTTP_SYNC_URL_FORMAT) +
+                            strlen(discovery_response->host) +
+                            strlen(discovery_response->path) +
+                            strlen(uniqueid)
+    );
+    if (!url_buff) {
+        fprintf(stderr, "run_http_sync: Out of memory!");
+        return NULL;
+    }
+
+    char *post_data = NULL;
+
+    sprintf(url_buff, HTTP_SYNC_URL_FORMAT,
+            discovery_response->host,
+            discovery_response->path,
+            uniqueid
+    );
+
+    printf("url_buff: %s\n", url_buff);
+#endif
 
     IotConnectHttpResponse response;
     iotconnect_https_request(&response,
@@ -174,23 +206,43 @@ static IotclSyncResponse *run_http_sync(const char *cpid, const char *uniqueid) 
         dump_response("WARN: Expected JSON to start immediately in the returned data.", &response);
     }
 
-    ret = iotcl_discovery_parse_sync_response(json_start);
-    if (!ret || ret->ds != IOTCL_SR_OK) {
-        if (config.auth_info.type == IOTC_AT_TPM && ret && ret->ds == IOTCL_SR_DEVICE_NOT_REGISTERED) {
-            // malloc below will be freed when we iotcl_discovery_free_sync_response
-            ret->broker.client_id = malloc(strlen(uniqueid) + 1 /* - */ + strlen(cpid) + 1);
-            if(!ret->broker.client_id) {
-                dump_response("Unable to allocate memory,", &response);
-                goto cleanup;
-            }
-
-            sprintf(ret->broker.client_id, "%s-%s", cpid, uniqueid);
-            printf("TPM Device is not yet enrolled. Enrolling...\n");
-        } else {
-            report_sync_error(ret, response.data);
-            iotcl_discovery_free_sync_response(ret);
-            ret = NULL;
+    if(iotcl_discovery_parse_sync_response(json_start, &ret) == 0) {
+#if AZURE
+        // check cpid from header file matches cpid from sync response
+        if(strcmp(cpid, ret->cpid) != 0) {
+            dump_response("cpid != ret->cpid", &response);
+            goto cleanup;
         }
+#endif
+
+// wait until get a value of 3 for self-signed
+#if 0
+        // check at from header file matches at from sync response
+        if(config.auth_info.type != ret->meta.at) {
+            dump_response("onfig.auth_info.type != ret->meta.at", &response);
+            goto cleanup;
+        }
+#endif
+
+        if (ret->ds != IOTCL_SR_OK) {
+            if (config.auth_info.type == IOTC_AT_TPM && ret->ds == IOTCL_SR_DEVICE_NOT_REGISTERED) {
+                // malloc below will be freed when we iotcl_discovery_free_sync_response
+                ret->broker.client_id = malloc(strlen(uniqueid) + 1 /* - */ + strlen(cpid) + 1);
+                if(!ret->broker.client_id) {
+                    dump_response("Unable to allocate memory,", &response);
+                    goto cleanup;
+                }
+
+                sprintf(ret->broker.client_id, "%s-%s", cpid, uniqueid);
+                printf("TPM Device is not yet enrolled. Enrolling...\n");
+            } else {
+                report_sync_error(ret->ds, response.data);
+                iotcl_discovery_free_sync_response(ret);
+                ret = NULL;
+            }
+        }
+    } else {
+        report_sync_error(IOTCL_SR_PARSING_ERROR, response.data);
     }
 
     cleanup:
@@ -239,7 +291,7 @@ static void on_message_intercept(IotclEventData data, IotConnectEventType type) 
             iotcl_discovery_free_discovery_response(discovery_response);
             iotcl_discovery_free_sync_response(sync_response);
             sync_response = NULL;
-            discovery_response = run_http_discovery(config.cpid, config.env);
+            discovery_response = run_http_discovery(config.discovery_host, config.cpid, config.env);
             if (NULL == discovery_response) {
                 fprintf(stderr, "Unable to run HTTP discovery on ON_FORCE_SYNC\n");
                 return;
@@ -290,7 +342,7 @@ int iotconnect_sdk_init(void) {
     }
 
     if (!discovery_response) {
-        discovery_response = run_http_discovery(config.cpid, config.env);
+        discovery_response = run_http_discovery(config.discovery_host, config.cpid, config.env);
         if (NULL == discovery_response) {
             // get_base_url will print the error
             return -1;
@@ -321,11 +373,12 @@ int iotconnect_sdk_init(void) {
     lib_config.event_functions.cmd_cb = config.cmd_cb;
     lib_config.event_functions.msg_cb = on_message_intercept;
 
-    lib_config.telemetry.dtg = sync_response->dtg;
+    lib_config.telemetry.cd = sync_response->meta.cd;
 
     char cpid_buff[5];
     strncpy(cpid_buff, config.cpid, 4);
     cpid_buff[4] = 0;
+    printf("DISCOVERY HOST: %s\n", config.discovery_host ? config.discovery_host : "(default)" );
     printf("CPID: %s***\n", cpid_buff);
     printf("ENV:  %s\n", config.env);
 
@@ -377,7 +430,7 @@ int iotconnect_sdk_init(void) {
             return -1;
         }
     }
-    if (!iotcl_init(&lib_config)) {
+    if (!iotcl_init_v2(&lib_config)) {
         fprintf(stderr, "Error: Failed to initialize the IoTConnect Lib\n");
         return -1;
     }
@@ -391,12 +444,13 @@ int iotconnect_sdk_init(void) {
 
     ret = iotc_device_client_init(&pc);
     if (ret) {
-        fprintf(stderr, "Failed to connect!\n");
+        fprintf(stderr, "iotc_device_client_init() Failed to connect!\n");
         return ret;
     }
 
+#if 0
     // Workaround: upon first time TPM registration, the information returned from sync will be partial,
-    // so update dtg with new sync call
+    // so update CT with new sync call
     if (config.auth_info.type == IOTC_AT_TPM && sync_response->ds == IOTCL_SR_DEVICE_NOT_REGISTERED) {
         iotcl_discovery_free_sync_response(sync_response);
         sync_response = run_http_sync(config.cpid, config.duid);
@@ -404,9 +458,10 @@ int iotconnect_sdk_init(void) {
             // Sync_call will print the error
             return -2;
         }
-        lib_config.telemetry.dtg = sync_response->dtg;
-        printf("Secondary Sync response parsing successful. DTG is: %s.\n", sync_response->dtg);
+        lib_config.telemetry.ct = sync_response->ct;
+        printf("Secondary Sync response parsing successful. CT is: %s.\n", sync_response->ct);
     }
+#endif
 
     return ret;
 }

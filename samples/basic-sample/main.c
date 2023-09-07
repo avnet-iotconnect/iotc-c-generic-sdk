@@ -150,6 +150,12 @@ int main(int argc, char *argv[]) {
     }
 
     IotConnectClientConfig *config = iotconnect_sdk_init_and_get_config();
+#ifdef IOTCONNECT_DISCOVERY_HOSTNAME
+    config->discovery_host = IOTCONNECT_DISCOVERY_HOSTNAME;
+#else
+    // use DEFAULT_IOTCONNECT_DISCOVERY_HOSTNAME
+    config->discovery_host = NULL;
+#endif
     config->cpid = IOTCONNECT_CPID;
     config->env = IOTCONNECT_ENV;
     config->duid = IOTCONNECT_DUID;
