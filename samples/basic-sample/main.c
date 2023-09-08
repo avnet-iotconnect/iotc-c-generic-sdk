@@ -50,14 +50,18 @@ static void command_status(IotclEventData data, bool status, const char *command
     free((void *) ack);
 }
 
+#define TEST 1
+#define ECHO_COMMAND "echo "
+
+#ifdef TEST
 // really for debugging/testing -- this sends the last "echo" command received -- almost a copy of publish_telemetry()
-static void publish_echo_command(const char *last_command) {
+static void publish_c2d_test(const char *test_attribute, const char *test_message) {
     IotclMessageHandle msg = iotcl_telemetry_create();
 
     // Optional. The first time you create a data point, the current timestamp will be automatically added
     // TelemetryAddWith* calls are only required if sending multiple data points in one packet.
     iotcl_telemetry_add_with_iso_time(msg, iotcl_iso_timestamp_now());
-    iotcl_telemetry_set_string(msg, "last-command", last_command);
+    iotcl_telemetry_set_string(msg, test_attribute, test_message);
 
     const char *str = iotcl_create_serialized_string(msg, false);
     iotcl_telemetry_destroy(msg);
@@ -65,23 +69,27 @@ static void publish_echo_command(const char *last_command) {
     iotconnect_sdk_send_packet(str); // underlying code will report an error
     iotcl_destroy_serialized(str);
 }
+#endif
 
-#define ECHO_COMMAND "echo "
 static void on_command(IotclEventData data) {
     char *command = iotcl_clone_command(data);
-    if (NULL != command) {
-        // the echo command is published as a last_command device attribute
-        printf("on_command() received: %s", command);
-        if(strncmp(command, ECHO_COMMAND, strlen(ECHO_COMMAND)) == 0) {
-            publish_echo_command(command);
-            command_status(data, true, command, "Success");
-        } else {
-            command_status(data, false, command, "Not implemented");
-        }
-        free((void *) command);
-    } else {
+    if (NULL == command) {
         command_status(data, false, "?", "Internal error");
+        return;
     }
+
+#ifdef TEST
+    // the echo command is published back to IoTConnect dashboard as a "test_last_command" device attribute
+    if(strncmp(command, ECHO_COMMAND, strlen(ECHO_COMMAND)) == 0) {
+        publish_c2d_test("test_last_command", command);
+        command_status(data, true, command, "Success");
+        free((void *) command);
+        return;
+    }
+#endif
+
+    command_status(data, false, command, "Not implemented");
+    free((void *) command);
 }
 
 static bool is_app_version_same_as_ota(const char *version) {
@@ -137,7 +145,10 @@ static void on_ota(IotclEventData data) {
         free((void *) ack);
     }
 
-    publish_echo_command(message);
+#ifdef TEST
+    // the OTA status is published back to IoTConnect dashboard as a "test_ota_status" device attribute
+    publish_c2d_test("test_ota_status", message);
+#endif
 }
 
 
