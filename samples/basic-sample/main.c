@@ -150,10 +150,81 @@ static void publish_telemetry(sensor_info_t sensor, int reading) {
 }
 
 
-//TODO: add proper error checking
-static int parse_sensors(cJSON* main_obj, sensor_info_t* sensor_data){
+static int parse_x509_certs(const cJSON* json_parser, cert_struct_t* certs){
 
-    if (!main_obj || !sensor_data){
+    if (!json_parser || !certs){
+        printf("NULL PTR.\r\n");
+        return 1;
+    }
+
+    cJSON *x509_obj = NULL;
+    cJSON *x509_id_cert = NULL;
+    cJSON *x509_id_key = NULL; 
+    // ignoring auth type for now
+
+    x509_obj = cJSON_GetObjectItem(json_parser, "x509_certs");
+
+    if (!x509_obj){
+        printf("Failed to get x509 object. Aborting\n");
+        return 1;
+    }
+
+    printf("auth type: %s\n", x509_obj->valuestring);
+
+    // TODO: add error checking
+    x509_id_cert = cJSON_GetObjectItemCaseSensitive(x509_obj, "client_cert");
+    x509_id_key = cJSON_GetObjectItemCaseSensitive(x509_obj, "client_key");
+
+    printf("id cert path: {%s}\n", x509_id_cert->valuestring);
+    printf("id key path: {%s}\n", x509_id_key->valuestring);
+
+
+    int key_len = 0;
+    key_len = strlen(x509_id_key->valuestring)*(sizeof(char));
+
+    int cert_len = 0;
+    cert_len = strlen(x509_id_cert->valuestring)*(sizeof(char));
+
+    printf("cert len: %d, key len: %d:\r\n",cert_len, key_len);
+
+    certs->x509_id_cert = calloc(cert_len, sizeof(char));
+
+    if (!certs->x509_id_cert){
+        printf("failed to malloc\r\n");
+        certs->x509_id_cert = NULL;
+        return 1;
+    }
+
+
+    certs->x509_id_key = calloc(key_len, sizeof(char));
+
+
+    if (!certs->x509_id_key){
+        printf("failed to malloc\r\n");
+        certs->x509_id_key = NULL;
+        return 1;
+    }
+
+    printf("cert: %s\r\n", x509_id_cert->valuestring);
+    memcpy(certs->x509_id_cert, x509_id_cert->valuestring, sizeof(char)*cert_len);
+    printf("current id key: {%s}\n\r current id cert: {%s}\r\n", certs->x509_id_key, certs->x509_id_cert);
+
+    memcpy(certs->x509_id_key, x509_id_key->valuestring, sizeof(char)*key_len);
+    printf("current id key: {%s}\n\r current id cert: {%s}\r\n", certs->x509_id_key, certs->x509_id_cert);
+   
+    printf("id cert path in struct: {%s}\n", certs->x509_id_cert);
+    printf("id key path in struct: {%s}\n", certs->x509_id_key);
+
+    certs->x509_id_cert[cert_len] = '\0';
+    certs->x509_id_key[key_len] = '\0';
+
+    return 0;
+}
+
+//TODO: add proper error checking
+static int parse_sensors(const cJSON* json_parser, sensor_info_t* sensor){
+
+    if (!json_parser || !sensor){
         printf("NULL PTR. Aborting\r\n");
     }
 
@@ -162,10 +233,10 @@ static int parse_sensors(cJSON* main_obj, sensor_info_t* sensor_data){
     cJSON *device_name = NULL;
     cJSON *device_path = NULL;
 
-    sensor_obj = cJSON_GetObjectItem(main_obj, "sensor");
+    sensor_obj = cJSON_GetObjectItem(json_parser, "sensor");
 
     if (!sensor_obj){
-        printf("Failed to get x509 object. Aborting\n");
+        printf("Failed to get sensor object. Aborting\n");
         cJSON_Delete(sensor_obj);
         return 1;
     }
@@ -174,14 +245,43 @@ static int parse_sensors(cJSON* main_obj, sensor_info_t* sensor_data){
     device_name = cJSON_GetObjectItemCaseSensitive(sensor_obj, "name");
     device_path = cJSON_GetObjectItemCaseSensitive(sensor_obj, "path");    
 
-    sensor_data->s_name = device_name->valuestring;
-    sensor_data->s_path = device_path->valuestring;
+    int s_name_len = 0;
+    s_name_len = strlen(device_name->valuestring)*(sizeof(char));
 
-    printf("device name (struct): %s\r\n",sensor_data->s_name);
-    printf("device path (struct): %s\r\n",sensor_data->s_path);
+    int s_path_len = 0;
+    s_path_len = strlen(device_path->valuestring)*(sizeof(char));
 
-    cJSON_Delete(sensor_obj);
-    
+    printf("path len: %d, name len: %d:\r\n",s_path_len, s_name_len);
+
+    sensor->s_name = calloc(s_name_len, sizeof(char));
+
+    if (!sensor->s_name){
+        printf("failed to malloc\r\n");
+        sensor->s_name = NULL;
+        return 1;
+    }
+
+
+    sensor->s_path = calloc(s_path_len, sizeof(char));
+
+
+    if (!sensor->s_path){
+        printf("failed to malloc\r\n");
+        sensor->s_path = NULL;
+        return 1;
+    }
+
+    memcpy(sensor->s_name, device_name->valuestring, sizeof(char)*s_name_len);
+    printf("current name key: {%s}\n\r current path cert: {%s}\r\n", sensor->s_name, sensor->s_path);
+
+    memcpy(sensor->s_path, device_path->valuestring, sizeof(char)*s_path_len);
+    printf("current name: {%s}\n\r current path: {%s}\r\n", sensor->s_name, sensor->s_path);
+
+    sensor->s_name[s_name_len] = '\0';
+    sensor->s_path[s_path_len] = '\0';
+
+    printf("device name (struct): %s\r\n",sensor->s_name);
+    printf("device path (struct): %s\r\n",sensor->s_path); 
 
     return 0;
 }
@@ -197,10 +297,6 @@ static int parse_paramaters_json(const char* json_str, cert_struct_t* certs, sen
     printf("json_str in function: %s\n", json_str);
 
     cJSON *auth_type = NULL;
-    
-    cJSON *x509_obj = NULL;
-    cJSON *x509_id_cert = NULL;
-    cJSON *x509_id_key = NULL; 
 
     cJSON *json_parser = NULL;
 
@@ -225,77 +321,35 @@ static int parse_paramaters_json(const char* json_str, cert_struct_t* certs, sen
 
     printf("auth type: %s\n", auth_type->valuestring);
 
-    // ignoring auth type for now
-
-    x509_obj = cJSON_GetObjectItem(json_parser, "x509_certs");
-
-    if (!x509_obj){
-        printf("Failed to get x509 object. Aborting\n");
-        goto FAIL;
-    }
-
-    printf("auth type: %s\n", x509_obj->valuestring);
-
-    // TODO: add error checking
-    x509_id_cert = cJSON_GetObjectItemCaseSensitive(x509_obj, "client_cert");
-    x509_id_key = cJSON_GetObjectItemCaseSensitive(x509_obj, "client_key");
-
-    printf("id cert path: {%s}\n", x509_id_cert->valuestring);
-    printf("id key path: {%s}\n", x509_id_key->valuestring);
-
-
-    certs->x509_id_cert = x509_id_cert->valuestring;
-    certs->x509_id_key = x509_id_key->valuestring;
-
-    printf("id cert path in struct: {%s}\n", certs->x509_id_cert);
-    printf("id key path in struct: {%s}\n", certs->x509_id_key);
-
-    //TODO; maybe rething this
-    if (cJSON_HasObjectItem(json_parser, "sensor") == true){
-        //parse_sensors(json_parser, sensor);
-
-        cJSON *sensor_obj = NULL;
-
-        cJSON *device_name = NULL;
-        cJSON *device_path = NULL;
-
-        sensor_obj = cJSON_GetObjectItem(json_parser, "sensor");
-
-        if (!sensor_obj){
-            printf("Failed to get sensor object. Aborting\n");
-            cJSON_Delete(sensor_obj);
+    if (strcmp(auth_type->valuestring, "X509") == STRINGS_ARE_EQUAL && cJSON_HasObjectItem(json_parser, "x509_certs") == true){
+        if (parse_x509_certs(json_parser, certs) != 0) {
+            printf("failed to parse x509 certs. Aborting\r\n");
             return 1;
         }
+    }
 
-
-        device_name = cJSON_GetObjectItemCaseSensitive(sensor_obj, "name");
-        device_path = cJSON_GetObjectItemCaseSensitive(sensor_obj, "path");    
-
-        sensor->s_name = device_name->valuestring;
-        sensor->s_path = device_path->valuestring;
-
-        printf("device name (struct): %s\r\n",sensor->s_name);
-        printf("device path (struct): %s\r\n",sensor->s_path);
-
-
-
-        //cJSON_Delete(sensor_obj);
+    //TODO; maybe rethink this
+    if (cJSON_HasObjectItem(json_parser, "sensor") == true){
+        if (parse_sensors(json_parser, sensor) != 0){
+            printf("failed to parse sensor. Aborting\r\n");
+            return 1;
+        }
+        printf("sensor data: name - %s; path - %s\r\n", sensor->s_name, sensor->s_path);
     }
     
-    //printf("sensor data: name - %s; path - %s\r\n", *sensor->s_name, *sensor->s_path);
 
-    //cJSON_Delete(json_parser);
-    //cJSON_Delete(x509_obj);
+
+    cJSON_Delete(json_parser);
     return 0;
 
 FAIL:
 
     cJSON_Delete(json_parser);
-    cJSON_Delete(x509_obj);
     return 1;
 
 }
 
+// TODO: currently will only read first 5 characters from specified file
 static int read_sensor(sensor_info_t sensor_data){
 
     char buff[6];
@@ -310,14 +364,6 @@ static int read_sensor(sensor_info_t sensor_data){
 
         
     fd = fopen(sensor_data.s_path, "r");
-    
-    /*
-    if (!fd) {
-        printf("Failed to open file.\r\n");
-        return -1;
-    }
-    */
-
 
     //TODO: magic number
     for (int i = 0; i < 5; i++){
@@ -330,7 +376,7 @@ static int read_sensor(sensor_info_t sensor_data){
 
     reading = (int)atof(buff);
 
-    printf("raw but int: %d", reading);
+    printf("raw int: %d", reading);
 
     return reading;
 }
@@ -505,6 +551,16 @@ int main(int argc, char *argv[]) {
         }
         iotconnect_sdk_disconnect();
     }
+
+    free(certs.x509_id_cert);
+    free(certs.x509_id_key);
+    free(sensor_data.s_name);
+    free(sensor_data.s_path);
+
+    certs.x509_id_cert = NULL;
+    certs.x509_id_key = NULL;
+    sensor_data.s_name = NULL;
+    sensor_data.s_path = NULL;
 
     return 0;
 }
