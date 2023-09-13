@@ -286,8 +286,40 @@ static int parse_sensors(const cJSON* json_parser, sensor_info_t* sensor){
     return 0;
 }
 
+static int parse_base_params(char** dest, char* json_src, cJSON* json_parser){
+    if (!json_parser){
+        printf("NULL PTR. Aborting\r\n");
+        return 1;
+    }
+
+    cJSON* req_json_str = NULL;
+
+    req_json_str = cJSON_GetObjectItemCaseSensitive(json_parser, json_src);
+
+    if (!req_json_str) {
+        printf("Failed to get %s from json. Aborting\n\r", json_src);
+        return 1;
+    }
+    int str_len = 0;
+    str_len = strlen(req_json_str->valuestring)*(sizeof(char));
+
+    printf("str len: %d:\r\n",str_len);
+
+    *dest = calloc(str_len, sizeof(char));
+
+    if (!*dest){
+        printf("failed to malloc\r\n");
+        *dest = NULL;
+        return 1;
+    }
+
+    memcpy(*dest, req_json_str->valuestring, sizeof(char)*str_len);
+
+    return 0;
+}
+
 //TODO: add error checking
-static int parse_paramaters_json(const char* json_str, cert_struct_t* certs, sensor_info_t* sensor){
+static int parse_paramaters_json(const char* json_str, IotConnectClientConfig* iotc_config, cert_struct_t* certs, sensor_info_t* sensor){
 
     if (!json_str || !certs){
         printf("NULL PTR. Aborting\n");
@@ -296,9 +328,13 @@ static int parse_paramaters_json(const char* json_str, cert_struct_t* certs, sen
 
     printf("json_str in function: %s\n", json_str);
 
-    cJSON *auth_type = NULL;
-
     cJSON *json_parser = NULL;
+
+    cJSON *duid_json = NULL;
+    cJSON *cpid_json = NULL;
+    cJSON *env_json = NULL;
+
+    cJSON *auth_type = NULL;
 
 
     json_parser = cJSON_Parse(json_str);
@@ -311,6 +347,60 @@ static int parse_paramaters_json(const char* json_str, cert_struct_t* certs, sen
         }
         goto FAIL;
     }
+
+    if (parse_base_params(&iotc_config->duid, "duid", json_parser) != 0){
+        printf("Failed to get duid from json file. Aborting.\r\n");
+        goto FAIL;
+    }
+
+    printf("saved duid: %s \r\n", iotc_config->duid);
+
+    /*
+    cpid_json = cJSON_GetObjectItemCaseSensitive(json_parser, "cpid");
+
+    if (!cpid_json) {
+        printf("Failed to get duid from json. Aborting\n");
+        goto FAIL;
+    }
+ 
+    str_len = strlen(cpid_json->valuestring)*(sizeof(char));
+
+    printf("str len: %d:\r\n",str_len);
+
+    iotc_config->duid = calloc(str_len, sizeof(char));
+
+    if (!iotc_config->duid){
+        printf("failed to malloc\r\n");
+        iotc_config->duid = NULL;
+        return 1;
+    }
+
+    memcpy(iotc_config->duid, cpid_json->valuestring, sizeof(char)*str_len);
+    printf("saved duid: %s \r\n", iotc_config->duid);
+
+        duid_json = cJSON_GetObjectItemCaseSensitive(json_parser, "duid");
+
+    if (!duid_json) {
+        printf("Failed to get duid from json. Aborting\n");
+        goto FAIL;
+    }
+  
+    str_len = strlen(duid_json->valuestring)*(sizeof(char));
+
+    printf("str len: %d:\r\n",str_len);
+
+    iotc_config->duid = calloc(str_len, sizeof(char));
+
+    if (!iotc_config->duid){
+        printf("failed to malloc\r\n");
+        iotc_config->duid = NULL;
+        return 1;
+    }
+
+    memcpy(iotc_config->duid, duid_json->valuestring, sizeof(char)*str_len);
+    printf("saved duid: %s \r\n", iotc_config->duid);
+
+    */
 
     auth_type = cJSON_GetObjectItemCaseSensitive(json_parser, "auth_type");
 
@@ -397,6 +487,8 @@ int main(int argc, char *argv[]) {
     char* x509_identity_cert = NULL;
     char* x509_identity_key = NULL;
 
+    IotConnectClientConfig *config = iotconnect_sdk_init_and_get_config();
+
     if (argc > 1) {
         // assuming only 2 parameters for now
            
@@ -453,7 +545,7 @@ int main(int argc, char *argv[]) {
 
         fclose(fd);
 
-        if (parse_paramaters_json(json_str, &certs, &sensor_data) != 0) {
+        if (parse_paramaters_json(json_str, config, &certs, &sensor_data) != 0) {
             printf("Failed to parse input JSON file. Aborting\n");
             if (json_str) {
                 free(json_str);
@@ -462,6 +554,7 @@ int main(int argc, char *argv[]) {
             return 1;
         }
 
+        printf("DUID in main: %s\r\n", config->duid);
 
         printf("id cert path in struct IN MAIN: {%s}\n", certs.x509_id_cert);
         printf("id key path in struct IN MAIN: {%s}\n", certs.x509_id_key);
@@ -503,7 +596,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    IotConnectClientConfig *config = iotconnect_sdk_init_and_get_config();
+    
     config->cpid = IOTCONNECT_CPID;
     config->env = IOTCONNECT_ENV;
     config->duid = IOTCONNECT_DUID;
