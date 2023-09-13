@@ -137,7 +137,9 @@ static void publish_telemetry(sensor_info_t sensor, int reading) {
     iotcl_telemetry_add_with_iso_time(msg, iotcl_iso_timestamp_now());
     iotcl_telemetry_set_string(msg, "version", APP_VERSION);
     iotcl_telemetry_set_number(msg, "cpu", 3.123); // test floating point numbers
-    iotcl_telemetry_set_number(msg, sensor.s_name, reading);
+    if (sensor.s_name && sensor.s_path){
+        //iotcl_telemetry_set_number(msg, sensor.s_name, reading);
+    }
     iotcl_telemetry_set_bool(msg, "is_vlads_test", true);
     iotcl_telemetry_set_string(msg, "my_str", "MY STRING WILL BE DESTROYED");
     iotcl_telemetry_set_null(msg, "my_str");
@@ -150,9 +152,9 @@ static void publish_telemetry(sensor_info_t sensor, int reading) {
 }
 
 
-static int parse_x509_certs(const cJSON* json_parser, cert_struct_t* certs){
+static int parse_x509_certs(const cJSON* json_parser, char** id_key, char** id_cert){
 
-    if (!json_parser || !certs){
+    if (!json_parser){
         printf("NULL PTR.\r\n");
         return 1;
     }
@@ -187,36 +189,32 @@ static int parse_x509_certs(const cJSON* json_parser, cert_struct_t* certs){
 
     printf("cert len: %d, key len: %d:\r\n",cert_len, key_len);
 
-    certs->x509_id_cert = calloc(cert_len, sizeof(char));
+    *id_cert = calloc(cert_len, sizeof(char));
 
-    if (!certs->x509_id_cert){
+    if (!*id_cert){
         printf("failed to malloc\r\n");
-        certs->x509_id_cert = NULL;
+        *id_cert = NULL;
         return 1;
     }
 
 
-    certs->x509_id_key = calloc(key_len, sizeof(char));
+    *id_key = calloc(key_len, sizeof(char));
 
 
-    if (!certs->x509_id_key){
+    if (!*id_key){
         printf("failed to malloc\r\n");
-        certs->x509_id_key = NULL;
+        *id_key = NULL;
         return 1;
     }
 
-    printf("cert: %s\r\n", x509_id_cert->valuestring);
-    memcpy(certs->x509_id_cert, x509_id_cert->valuestring, sizeof(char)*cert_len);
-    printf("current id key: {%s}\n\r current id cert: {%s}\r\n", certs->x509_id_key, certs->x509_id_cert);
 
-    memcpy(certs->x509_id_key, x509_id_key->valuestring, sizeof(char)*key_len);
-    printf("current id key: {%s}\n\r current id cert: {%s}\r\n", certs->x509_id_key, certs->x509_id_cert);
-   
-    printf("id cert path in struct: {%s}\n", certs->x509_id_cert);
-    printf("id key path in struct: {%s}\n", certs->x509_id_key);
+    memcpy(*id_cert, x509_id_cert->valuestring, sizeof(char)*cert_len);
 
-    certs->x509_id_cert[cert_len] = '\0';
-    certs->x509_id_key[key_len] = '\0';
+    memcpy(*id_key, x509_id_key->valuestring, sizeof(char)*key_len);
+
+
+    id_cert[cert_len] = '\0';
+    id_key[key_len] = '\0';
 
     return 0;
 }
@@ -272,16 +270,12 @@ static int parse_sensors(const cJSON* json_parser, sensor_info_t* sensor){
     }
 
     memcpy(sensor->s_name, device_name->valuestring, sizeof(char)*s_name_len);
-    printf("current name key: {%s}\n\r current path cert: {%s}\r\n", sensor->s_name, sensor->s_path);
 
     memcpy(sensor->s_path, device_path->valuestring, sizeof(char)*s_path_len);
-    printf("current name: {%s}\n\r current path: {%s}\r\n", sensor->s_name, sensor->s_path);
 
     sensor->s_name[s_name_len] = '\0';
     sensor->s_path[s_path_len] = '\0';
 
-    printf("device name (struct): %s\r\n",sensor->s_name);
-    printf("device path (struct): %s\r\n",sensor->s_path); 
 
     return 0;
 }
@@ -303,7 +297,7 @@ static int parse_base_params(char** dest, char* json_src, cJSON* json_parser){
     int str_len = 0;
     str_len = strlen(req_json_str->valuestring)*(sizeof(char));
 
-    printf("str len: %d:\r\n",str_len);
+    //printf("str len: %d:\r\n",str_len);
 
     *dest = calloc(str_len, sizeof(char));
 
@@ -314,14 +308,58 @@ static int parse_base_params(char** dest, char* json_src, cJSON* json_parser){
     }
 
     memcpy(*dest, req_json_str->valuestring, sizeof(char)*str_len);
+    //printf("copied: %s\r\n", *dest);
+    dest[str_len] = '\0';
 
     return 0;
 }
 
-//TODO: add error checking
-static int parse_paramaters_json(const char* json_str, IotConnectClientConfig* iotc_config, cert_struct_t* certs, sensor_info_t* sensor){
+static void free_iotc_config(IotConnectClientConfig* iotc_config) {
+    
+    printf("freeing iotconnect conf\r\n");
 
-    if (!json_str || !certs){
+    if (iotc_config->cpid){
+        free(iotc_config->cpid);
+        iotc_config->cpid = NULL;
+    }
+
+
+    if (iotc_config->duid){
+        free(iotc_config->duid);
+        iotc_config->duid = NULL;
+    }
+
+
+    if (iotc_config->env){
+        free(iotc_config->env);
+        iotc_config->env = NULL;
+    }
+
+
+    if (iotc_config->auth_info.data.cert_info.device_cert){
+        free(iotc_config->auth_info.data.cert_info.device_cert);
+        iotc_config->auth_info.data.cert_info.device_cert = NULL;
+    }
+
+
+    if (iotc_config->auth_info.data.cert_info.device_key){
+        free(iotc_config->auth_info.data.cert_info.device_key);
+        iotc_config->auth_info.data.cert_info.device_key = NULL;
+    }
+
+
+    if (iotc_config->auth_info.data.symmetric_key){
+        free(iotc_config->auth_info.data.symmetric_key);
+        iotc_config->auth_info.data.symmetric_key = NULL;
+    }
+
+
+}
+
+//TODO: add error checking
+static int parse_paramaters_json(const char* json_str, IotConnectClientConfig* iotc_config, sensor_info_t* sensor){
+
+    if (!json_str){
         printf("NULL PTR. Aborting\n");
         return 1;
     }
@@ -329,10 +367,6 @@ static int parse_paramaters_json(const char* json_str, IotConnectClientConfig* i
     printf("json_str in function: %s\n", json_str);
 
     cJSON *json_parser = NULL;
-
-    cJSON *duid_json = NULL;
-    cJSON *cpid_json = NULL;
-    cJSON *env_json = NULL;
 
     cJSON *auth_type = NULL;
 
@@ -353,55 +387,17 @@ static int parse_paramaters_json(const char* json_str, IotConnectClientConfig* i
         goto FAIL;
     }
 
-    printf("saved duid: %s \r\n", iotc_config->duid);
-
-    /*
-    cpid_json = cJSON_GetObjectItemCaseSensitive(json_parser, "cpid");
-
-    if (!cpid_json) {
-        printf("Failed to get duid from json. Aborting\n");
+    if (parse_base_params(&iotc_config->cpid, "cpid", json_parser) != 0){
+        printf("Failed to get duid from json file. Aborting.\r\n");
         goto FAIL;
     }
- 
-    str_len = strlen(cpid_json->valuestring)*(sizeof(char));
 
-    printf("str len: %d:\r\n",str_len);
-
-    iotc_config->duid = calloc(str_len, sizeof(char));
-
-    if (!iotc_config->duid){
-        printf("failed to malloc\r\n");
-        iotc_config->duid = NULL;
-        return 1;
-    }
-
-    memcpy(iotc_config->duid, cpid_json->valuestring, sizeof(char)*str_len);
-    printf("saved duid: %s \r\n", iotc_config->duid);
-
-        duid_json = cJSON_GetObjectItemCaseSensitive(json_parser, "duid");
-
-    if (!duid_json) {
-        printf("Failed to get duid from json. Aborting\n");
+    if (parse_base_params(&iotc_config->env, "env", json_parser) != 0){
+        printf("Failed to get duid from json file. Aborting.\r\n");
         goto FAIL;
     }
-  
-    str_len = strlen(duid_json->valuestring)*(sizeof(char));
 
-    printf("str len: %d:\r\n",str_len);
-
-    iotc_config->duid = calloc(str_len, sizeof(char));
-
-    if (!iotc_config->duid){
-        printf("failed to malloc\r\n");
-        iotc_config->duid = NULL;
-        return 1;
-    }
-
-    memcpy(iotc_config->duid, duid_json->valuestring, sizeof(char)*str_len);
-    printf("saved duid: %s \r\n", iotc_config->duid);
-
-    */
-
+    
     auth_type = cJSON_GetObjectItemCaseSensitive(json_parser, "auth_type");
 
     if (!auth_type) {
@@ -411,18 +407,42 @@ static int parse_paramaters_json(const char* json_str, IotConnectClientConfig* i
 
     printf("auth type: %s\n", auth_type->valuestring);
 
-    if (strcmp(auth_type->valuestring, "X509") == STRINGS_ARE_EQUAL && cJSON_HasObjectItem(json_parser, "x509_certs") == true){
-        if (parse_x509_certs(json_parser, certs) != 0) {
+    if (strcmp(auth_type->valuestring, "IOTC_AT_X509") == STRINGS_ARE_EQUAL){
+        iotc_config->auth_info.type = IOTC_AT_X509;
+    } else if (strcmp(auth_type->valuestring, "IOTC_AT_SYMMETRIC_KEY") == STRINGS_ARE_EQUAL){
+        iotc_config->auth_info.type = IOTC_AT_SYMMETRIC_KEY;
+    } else if (strcmp(auth_type->valuestring, "IOTC_AT_TPM") == STRINGS_ARE_EQUAL) {
+        iotc_config->auth_info.type = IOTC_AT_TPM;
+    } else if (strcmp(auth_type->valuestring, "IOTC_AT_TOKEN") == STRINGS_ARE_EQUAL) {
+        iotc_config->auth_info.type = IOTC_AT_TOKEN;
+    } else {
+        printf("unsupported auth type. Aborting\r\n");
+        goto FAIL;
+    }
+
+    if (iotc_config->auth_info.type == IOTC_AT_X509 && cJSON_HasObjectItem(json_parser, "x509_certs") == true){
+        if (parse_x509_certs(json_parser, &iotc_config->auth_info.data.cert_info.device_key,&iotc_config->auth_info.data.cert_info.device_cert) != 0) {
             printf("failed to parse x509 certs. Aborting\r\n");
             return 1;
         }
+        
+
+    } else if (iotc_config->auth_info.type == IOTC_AT_SYMMETRIC_KEY && cJSON_HasObjectItem(json_parser, "symmkey") == true){
+        if (parse_base_params(&iotc_config->auth_info.data.symmetric_key, "symmkey", json_parser) != 0){
+            printf("Failed to get duid from json file. Aborting.\r\n");
+            goto FAIL;
+        }
+
+        printf("saved symmkey: %s \r\n", iotc_config->auth_info.data.symmetric_key);
+    } else {
+        //TODO: placeholder for other auth types
     }
 
     //TODO; maybe rethink this
     if (cJSON_HasObjectItem(json_parser, "sensor") == true){
         if (parse_sensors(json_parser, sensor) != 0){
             printf("failed to parse sensor. Aborting\r\n");
-            return 1;
+            return 1; // do we want to fail here?
         }
         printf("sensor data: name - %s; path - %s\r\n", sensor->s_name, sensor->s_path);
     }
@@ -433,6 +453,8 @@ static int parse_paramaters_json(const char* json_str, IotConnectClientConfig* i
     return 0;
 
 FAIL:
+
+    free_iotc_config(iotc_config);
 
     cJSON_Delete(json_parser);
     return 1;
@@ -481,13 +503,12 @@ int main(int argc, char *argv[]) {
     printf("input counter: %d\n", argc);
 
     char* input_json_file = NULL;
-    cert_struct_t certs;
     sensor_info_t sensor_data;
 
-    char* x509_identity_cert = NULL;
-    char* x509_identity_key = NULL;
 
     IotConnectClientConfig *config = iotconnect_sdk_init_and_get_config();
+    // leaving this non-modifiable or now
+    config->auth_info.trust_store = IOTCONNECT_SERVER_CERT;
 
     if (argc > 1) {
         // assuming only 2 parameters for now
@@ -545,7 +566,7 @@ int main(int argc, char *argv[]) {
 
         fclose(fd);
 
-        if (parse_paramaters_json(json_str, config, &certs, &sensor_data) != 0) {
+        if (parse_paramaters_json(json_str, config, &sensor_data) != 0) {
             printf("Failed to parse input JSON file. Aborting\n");
             if (json_str) {
                 free(json_str);
@@ -556,66 +577,58 @@ int main(int argc, char *argv[]) {
 
         printf("DUID in main: %s\r\n", config->duid);
 
-        printf("id cert path in struct IN MAIN: {%s}\n", certs.x509_id_cert);
-        printf("id key path in struct IN MAIN: {%s}\n", certs.x509_id_key);
-
-        if(access(certs.x509_id_key, F_OK) != 0){
-            printf("failed to access parameter 1 - %s ; Aborting\n", certs.x509_id_key);
-            return 1;
-        } else {
-            x509_identity_key = certs.x509_id_key;
-        }
         
 
-        if(access(certs.x509_id_cert, F_OK) != 0){
-            printf("failed to access parameter 2 - %s ; Aborting\n", certs.x509_id_cert);
-            return 1;
-        } else {
-            x509_identity_cert = certs.x509_id_cert;
+        if (config->auth_info.type == IOTC_AT_X509){
+            printf("id cert path: {%s}\n", config->auth_info.data.cert_info.device_cert);
+            printf("id key path: {%s}\n", config->auth_info.data.cert_info.device_key);
+            if(access(config->auth_info.data.cert_info.device_cert, F_OK) != 0){
+                printf("failed to access parameter 1 - %s ; Aborting\n", config->auth_info.data.cert_info.device_cert);
+                return 1;
+            }
+            
+
+            if(access(config->auth_info.data.cert_info.device_key, F_OK) != 0){
+                printf("failed to access parameter 2 - %s ; Aborting\n", config->auth_info.data.cert_info.device_key);
+                return 1;
+            }
         }
-
-        printf("read sensor device params. name - %s; path - %s\r\n", sensor_data.s_name, sensor_data.s_path);
-
+        if (sensor_data.s_name && sensor_data.s_path){
+            printf("read sensor device params. name - %s; path - %s\r\n", sensor_data.s_name, sensor_data.s_path);
+        }   
     } else {
-        x509_identity_cert = IOTCONNECT_IDENTITY_CERT;
-        x509_identity_key = IOTCONNECT_IDENTITY_KEY;
-        printf("Using built-in config parameters.\r\n");
-    }
+        
 
-    if (!x509_identity_cert || !x509_identity_key){
-        printf("one of the cert paths is NULL\r\n");
-    }
+        if (IOTCONNECT_AUTH_TYPE == IOTC_AT_X509) {
+            if (access(IOTCONNECT_IDENTITY_CERT, F_OK) != 0 ||
+                access(IOTCONNECT_IDENTITY_KEY, F_OK) != 0
+                    ) {
+                fprintf(stderr, "Unable to access device identity private key and certificate. "
+                    "Please change directory so that %s can be accessed from the application or update IOTCONNECT_CERT_PATH\n",
+                    IOTCONNECT_SERVER_CERT);
+            }
+        }
 
-    if (IOTCONNECT_AUTH_TYPE == IOTC_AT_X509) {
-        if (access(IOTCONNECT_IDENTITY_CERT, F_OK) != 0 ||
-            access(IOTCONNECT_IDENTITY_KEY, F_OK) != 0
-                ) {
-            fprintf(stderr, "Unable to access device identity private key and certificate. "
-                   "Please change directory so that %s can be accessed from the application or update IOTCONNECT_CERT_PATH\n",
-                   IOTCONNECT_SERVER_CERT);
+        
+        config->cpid = IOTCONNECT_CPID;
+        config->env = IOTCONNECT_ENV;
+        config->duid = IOTCONNECT_DUID;
+        config->auth_info.type = IOTCONNECT_AUTH_TYPE;
+        
+
+        if (config->auth_info.type == IOTC_AT_X509) {
+            config->auth_info.data.cert_info.device_cert = IOTCONNECT_IDENTITY_CERT;
+            config->auth_info.data.cert_info.device_key = IOTCONNECT_IDENTITY_KEY;
+        } else if (config->auth_info.type == IOTC_AT_TPM) {
+            config->auth_info.data.scope_id = IOTCONNECT_SCOPE_ID;
+        } else if (config->auth_info.type == IOTC_AT_SYMMETRIC_KEY){
+            config->auth_info.data.symmetric_key = IOTCONNECT_SYMMETRIC_KEY;
+        } else if (config->auth_info.type != IOTC_AT_TOKEN) { // token type does not need any secret or info
+            // none of the above
+            fprintf(stderr, "IOTCONNECT_AUTH_TYPE is invalid\n");
+            return -1;
         }
     }
-
-    
-    config->cpid = IOTCONNECT_CPID;
-    config->env = IOTCONNECT_ENV;
-    config->duid = IOTCONNECT_DUID;
-    config->auth_info.type = IOTCONNECT_AUTH_TYPE;
-    config->auth_info.trust_store = IOTCONNECT_SERVER_CERT;
-
-    if (config->auth_info.type == IOTC_AT_X509) {
-        config->auth_info.data.cert_info.device_cert = x509_identity_cert;
-        config->auth_info.data.cert_info.device_key = x509_identity_key;
-    } else if (config->auth_info.type == IOTC_AT_TPM) {
-        config->auth_info.data.scope_id = IOTCONNECT_SCOPE_ID;
-    } else if (config->auth_info.type == IOTC_AT_SYMMETRIC_KEY){
-        config->auth_info.data.symmetric_key = IOTCONNECT_SYMMETRIC_KEY;
-    } else if (config->auth_info.type != IOTC_AT_TOKEN) { // token type does not need any secret or info
-        // none of the above
-        fprintf(stderr, "IOTCONNECT_AUTH_TYPE is invalid\n");
-        return -1;
-    }
-
 
     config->status_cb = on_connection_status;
     config->ota_cb = on_ota;
@@ -634,7 +647,9 @@ int main(int argc, char *argv[]) {
 
         // send 10 messages
         for (int i = 0; iotconnect_sdk_is_connected() && i < 10; i++) {
-            reading = read_sensor(sensor_data);
+            if (sensor_data.s_name && sensor_data.s_path){
+                reading = read_sensor(sensor_data);
+            }
             publish_telemetry(sensor_data, reading);
             // repeat approximately evey ~5 seconds
             for (int k = 0; k < 500; k++) {
@@ -645,15 +660,7 @@ int main(int argc, char *argv[]) {
         iotconnect_sdk_disconnect();
     }
 
-    free(certs.x509_id_cert);
-    free(certs.x509_id_key);
-    free(sensor_data.s_name);
-    free(sensor_data.s_path);
-
-    certs.x509_id_cert = NULL;
-    certs.x509_id_key = NULL;
-    sensor_data.s_name = NULL;
-    sensor_data.s_path = NULL;
+    free_iotc_config(config);
 
     return 0;
 }
