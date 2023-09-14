@@ -39,7 +39,16 @@ typedef struct cert_struct {
 typedef struct sensor_info {
     char* s_name;
     char* s_path;
+    int reading;
 } sensor_info_t;
+
+typedef struct sensors_data {
+
+    __uint8_t size;
+    sensor_info_t *sensor;
+
+} sensors_data_t;
+
 
 static void on_connection_status(IotConnectConnectionStatus status) {
     // Add your own status handling
@@ -129,7 +138,7 @@ static void on_ota(IotclEventData data) {
 }
 
 
-static void publish_telemetry(sensor_info_t sensor, int reading) {
+static void publish_telemetry(sensors_data_t sensors) {
     IotclMessageHandle msg = iotcl_telemetry_create();
 
     // Optional. The first time you create a data point, the current timestamp will be automatically added
@@ -137,12 +146,10 @@ static void publish_telemetry(sensor_info_t sensor, int reading) {
     iotcl_telemetry_add_with_iso_time(msg, iotcl_iso_timestamp_now());
     iotcl_telemetry_set_string(msg, "version", APP_VERSION);
     iotcl_telemetry_set_number(msg, "cpu", 3.123); // test floating point numbers
-    if (sensor.s_name && sensor.s_path){
-        //iotcl_telemetry_set_number(msg, sensor.s_name, reading);
+    
+    for (int i = 0; i < sensors.size; i++){
+        iotcl_telemetry_set_number(msg, sensors.sensor[i].s_name, sensors.sensor[i].reading);
     }
-    iotcl_telemetry_set_bool(msg, "is_vlads_test", true);
-    iotcl_telemetry_set_string(msg, "my_str", "MY STRING WILL BE DESTROYED");
-    iotcl_telemetry_set_null(msg, "my_str");
 
     const char *str = iotcl_create_serialized_string(msg, false);
     iotcl_telemetry_destroy(msg);
@@ -220,9 +227,9 @@ static int parse_x509_certs(const cJSON* json_parser, char** id_key, char** id_c
 }
 
 //TODO: add proper error checking
-static int parse_sensors(const cJSON* json_parser, sensor_info_t* sensor){
+static int parse_sensors(const cJSON* json_parser, sensors_data_t* sensors){
 
-    if (!json_parser || !sensor){
+    if (!json_parser || !sensors){
         printf("NULL PTR. Aborting\r\n");
     }
 
@@ -231,7 +238,9 @@ static int parse_sensors(const cJSON* json_parser, sensor_info_t* sensor){
     cJSON *device_name = NULL;
     cJSON *device_path = NULL;
 
-    sensor_obj = cJSON_GetObjectItem(json_parser, "sensor");
+    cJSON *json_array_item = NULL;
+
+    sensor_obj = cJSON_GetObjectItem(json_parser, "sensors");
 
     if (!sensor_obj){
         printf("Failed to get sensor object. Aborting\n");
@@ -239,43 +248,64 @@ static int parse_sensors(const cJSON* json_parser, sensor_info_t* sensor){
         return 1;
     }
 
+    sensors->size = cJSON_GetArraySize(sensor_obj);
 
-    device_name = cJSON_GetObjectItemCaseSensitive(sensor_obj, "name");
-    device_path = cJSON_GetObjectItemCaseSensitive(sensor_obj, "path");    
-
-    int s_name_len = 0;
-    s_name_len = strlen(device_name->valuestring)*(sizeof(char));
-
-    int s_path_len = 0;
-    s_path_len = strlen(device_path->valuestring)*(sizeof(char));
-
-    printf("path len: %d, name len: %d:\r\n",s_path_len, s_name_len);
-
-    sensor->s_name = calloc(s_name_len, sizeof(char));
-
-    if (!sensor->s_name){
-        printf("failed to malloc\r\n");
-        sensor->s_name = NULL;
+    if (sensors->size <= 0) {
+        printf("Failed to get array size\r\n");
         return 1;
     }
 
+    sensors->sensor = calloc(sensors->size, sizeof(sensor_info_t));
 
-    sensor->s_path = calloc(s_path_len, sizeof(char));
-
-
-    if (!sensor->s_path){
-        printf("failed to malloc\r\n");
-        sensor->s_path = NULL;
+    if (!sensors->sensor){
+        printf("failed to allocate\r\n");
         return 1;
     }
 
-    memcpy(sensor->s_name, device_name->valuestring, sizeof(char)*s_name_len);
+    for (int i = 0; i < sensors->size; i++){
 
-    memcpy(sensor->s_path, device_path->valuestring, sizeof(char)*s_path_len);
+        json_array_item = cJSON_GetArrayItem(sensor_obj, i);
 
-    sensor->s_name[s_name_len] = '\0';
-    sensor->s_path[s_path_len] = '\0';
+        if (!json_array_item){
+            printf("Failed to access element %d of json sensor array\r\n", i);
+            return 1;
+        }
 
+        device_name = cJSON_GetObjectItemCaseSensitive(json_array_item, "name");
+        device_path = cJSON_GetObjectItemCaseSensitive(json_array_item, "path");    
+
+        int s_name_len = 0;
+        s_name_len = strlen(device_name->valuestring)*(sizeof(char));
+
+        int s_path_len = 0;
+        s_path_len = strlen(device_path->valuestring)*(sizeof(char));
+
+        sensors->sensor[i].s_name = calloc(s_name_len, sizeof(char));
+
+        if (!sensors->sensor[i].s_name){
+            printf("failed to malloc\r\n");
+            sensors->sensor[i].s_name = NULL;
+            return 1;
+        }
+
+
+        sensors->sensor[i].s_path = calloc(s_path_len, sizeof(char));
+
+
+        if (!sensors->sensor[i].s_path){
+            printf("failed to malloc\r\n");
+            sensors->sensor[i].s_path = NULL;
+            return 1;
+        }
+
+        memcpy(sensors->sensor[i].s_name, device_name->valuestring, sizeof(char)*s_name_len);
+
+        memcpy(sensors->sensor[i].s_path, device_path->valuestring, sizeof(char)*s_path_len);
+
+        sensors->sensor[i].s_name[s_name_len] = '\0';
+        sensors->sensor[i].s_path[s_path_len] = '\0';
+
+    }
 
     return 0;
 }
@@ -312,6 +342,31 @@ static int parse_base_params(char** dest, char* json_src, cJSON* json_parser){
     dest[str_len] = '\0';
 
     return 0;
+}
+
+static void free_sensor_data(sensors_data_t *sensors) {
+
+    printf("freeing sensor data\r\n");
+
+    for (int i = 0; i < sensors->size; i++){
+        if (sensors->sensor[i].s_path){
+            free(sensors->sensor[i].s_path);
+            sensors->sensor[i].s_path = NULL;
+        }
+
+        if (sensors->sensor[i].s_path){
+            free(sensors->sensor[i].s_path);
+            sensors->sensor[i].s_path = NULL;
+        }
+
+
+    }
+
+    if (sensors->sensor){
+        free(sensors->sensor);
+        sensors->sensor = NULL;
+    }
+
 }
 
 static void free_iotc_config(IotConnectClientConfig* iotc_config) {
@@ -357,14 +412,12 @@ static void free_iotc_config(IotConnectClientConfig* iotc_config) {
 }
 
 //TODO: add error checking
-static int parse_paramaters_json(const char* json_str, IotConnectClientConfig* iotc_config, sensor_info_t* sensor){
+static int parse_paramaters_json(const char* json_str, IotConnectClientConfig* iotc_config, sensors_data_t* sensors){
 
     if (!json_str){
         printf("NULL PTR. Aborting\n");
         return 1;
     }
-
-    printf("json_str in function: %s\n", json_str);
 
     cJSON *json_parser = NULL;
 
@@ -432,19 +485,17 @@ static int parse_paramaters_json(const char* json_str, IotConnectClientConfig* i
             printf("Failed to get duid from json file. Aborting.\r\n");
             goto FAIL;
         }
-
-        printf("saved symmkey: %s \r\n", iotc_config->auth_info.data.symmetric_key);
     } else {
         //TODO: placeholder for other auth types
     }
 
     //TODO; maybe rethink this
-    if (cJSON_HasObjectItem(json_parser, "sensor") == true){
-        if (parse_sensors(json_parser, sensor) != 0){
+    if (cJSON_HasObjectItem(json_parser, "sensors") == true){
+        if (parse_sensors(json_parser, sensors) != 0){
             printf("failed to parse sensor. Aborting\r\n");
-            return 1; // do we want to fail here?
+            goto FAIL;
         }
-        printf("sensor data: name - %s; path - %s\r\n", sensor->s_name, sensor->s_path);
+        //printf("sensor data: name - %s; path - %s\r\n", sensor->s_name, sensor->s_path);
     }
     
 
@@ -455,6 +506,7 @@ static int parse_paramaters_json(const char* json_str, IotConnectClientConfig* i
 FAIL:
 
     free_iotc_config(iotc_config);
+    free_sensor_data(sensors);
 
     cJSON_Delete(json_parser);
     return 1;
@@ -498,25 +550,21 @@ int main(int argc, char *argv[]) {
                IOTCONNECT_SERVER_CERT);
     }
 
-    printf("input counter: %d\n", argc);
-
     char* input_json_file = NULL;
-    sensor_info_t sensor_data;
 
+    sensors_data_t sensors;
+    sensors.size = 0;
 
     IotConnectClientConfig *config = iotconnect_sdk_init_and_get_config();
     // leaving this non-modifiable or now
     config->auth_info.trust_store = IOTCONNECT_SERVER_CERT;
 
-    if (argc > 1) {
-        // assuming only 2 parameters for now
+    if (argc == 2) {
+        // assuming only 1 parameters for now
            
         char * s = NULL;
         s = strstr(argv[1], ".json");
-        if (s){ 
-            printf("Found it in %s\n", argv[1]);
-
-        } else if (!s) {
+        if (!s) {
             printf("String .json not found inside of %s\n", argv[1]);
             return 1;
         }
@@ -544,8 +592,6 @@ int main(int argc, char *argv[]) {
             return 1;
         }
 
-        printf("found length %ld \n", file_len);
-        //char *text = NULL;
         rewind(fd);
 
 
@@ -560,11 +606,11 @@ int main(int argc, char *argv[]) {
         for (int i = 0; i < file_len; i++){
             json_str[i] = fgetc(fd);
         }
-        printf ("end str: \n%s\n", json_str);
+        //printf ("end str: \n%s\n", json_str);
 
         fclose(fd);
 
-        if (parse_paramaters_json(json_str, config, &sensor_data) != 0) {
+        if (parse_paramaters_json(json_str, config, &sensors) != 0) {
             printf("Failed to parse input JSON file. Aborting\n");
             if (json_str) {
                 free(json_str);
@@ -591,9 +637,13 @@ int main(int argc, char *argv[]) {
                 return 1;
             }
         }
-        if (sensor_data.s_name && sensor_data.s_path){
-            printf("read sensor device params. name - %s; path - %s\r\n", sensor_data.s_name, sensor_data.s_path);
-        }   
+        
+        /*
+        for (int i = 0; i < sensors.size; i++){
+            printf("id: %d;\n name %s;\n path %s;\r\n_____________\r\n", i, sensors.sensor[i].s_name, sensors.sensor[i].s_path);
+        }
+        */
+
     } else {
         
 
@@ -645,10 +695,11 @@ int main(int argc, char *argv[]) {
 
         // send 10 messages
         for (int i = 0; iotconnect_sdk_is_connected() && i < 10; i++) {
-            if (sensor_data.s_name && sensor_data.s_path){
-                reading = read_sensor(sensor_data);
+            for (int i = 0; i < sensors.size; i++){
+                sensors.sensor[i].reading = read_sensor(sensors.sensor[i]);
             }
-            publish_telemetry(sensor_data, reading);
+                
+            publish_telemetry(sensors);
             // repeat approximately evey ~5 seconds
             for (int k = 0; k < 500; k++) {
                 iotconnect_sdk_receive();
@@ -659,6 +710,7 @@ int main(int argc, char *argv[]) {
     }
 
     free_iotc_config(config);
+    free_sensor_data(&sensors);
 
     return 0;
 }
