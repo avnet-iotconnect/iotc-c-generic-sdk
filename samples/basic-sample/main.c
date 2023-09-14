@@ -488,8 +488,6 @@ static int read_sensor(sensor_info_t sensor_data){
 
     reading = (int)atof(buff);
 
-    printf("raw int: %d", reading);
-
     return reading;
 }
 
