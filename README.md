@@ -45,3 +45,60 @@ This project has git submodules that need to be pulled before building. You can 
 repo and create the identify for your device.
 Place the device certificate and private key into *certs/client-crt.pem* and *certs/client-key.pem* in the basic-sample project.
 * Build or re-build the project after editing the *app_config.h* file.  
+
+#### JSON config
+
+You can also pass a json file parameter to `basic-sample` - for example `basic-sample ../my_config.json` which would be used instad of `app_config.h` file.
+
+Current expected JSON format is:
+```json
+{
+    "duid": "azRTOS-demo-blueboard",
+    "cpid": "av",
+    "env": "avn",
+    "auth_type": "IOTC_AT_SYMMETRIC_KEY",
+    "symmkey": "UN0TwIaNf4LOOQVt79t3rw==",
+    "sensors": [{
+        "name": "light_sensor",
+        "path": "/home/some_file_to_read"
+    },
+    {
+        "name": "test_sensor",
+        "path": "/home/some_file_to_read_v3"
+    },
+    {
+        "name": "nonsense-sensor",
+        "path": "/home/some_file_to_read_v2"
+    }]
+}
+```
+
+Where `duid`, `cpid`, `env` and `auth_type` fields are mandatory.
+Depending on `auth_type` some other fields become mandatory too.
+In example above, because `auth_type` is set to `IOTC_AT_SYMMETRIC_KEY`, `symmkey` field is required too.
+If `auth_type` is set to `IOTC_AT_X509` a `x509_certs` object is required. See example below.
+
+```json
+{
+    "duid": "CSDKSelfSigned",
+    "cpid": "av",
+    "env": "avn",
+    "auth_type": "IOTC_AT_X509",
+    "x509_certs": {
+        "client_key": "/home/client1-key.pem",
+        "client_cert": "/home/client1.pem"
+    },
+    "sensors": [{
+        "name": "light_sensor",
+        "path": "/home/some_file_to_read"
+    },
+    {
+        "name": "test_sensor",
+        "path": "/home/some_file_to_read_v3"
+    }]
+}
+```
+
+Currently the only types implemented with proper parsing are `IOTC_AT_X509` and `IOTC_AT_SYMMETRIC_KEY`. (`IOTC_AT_TOKEN` will probably also work without changing anything, but it needs to be tested).
+`sensors` object is always optional, but, if present, it must be a JSON array.
+***NOTE:*** spaces in `name` fields for `sensors` array are causing problems at the moment (data is being sent, but doesn’t appear on IoTC dashboard). So, avoid using spaces.
