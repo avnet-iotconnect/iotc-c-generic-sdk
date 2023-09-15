@@ -1,0 +1,5 @@
+basic-sample/CMakeFiles
+basic-sample/SdkSources
+basic-sample/symmkey
+basic-sample/x509_config
+app_config.h

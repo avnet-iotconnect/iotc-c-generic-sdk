@@ -55,6 +55,11 @@ typedef enum command_type {
     COMMANDS_END
 } command_type_t;
 
+#define IS_VALID_COMMAND(x) ((x) > COMMAND_NULL && (x) < COMMANDS_END)
+
+// MOVE THIS LATER -afk
+static void publish_message(const char* key_str,const char* value_str);
+
 static void on_connection_status(IotConnectConnectionStatus status) {
     // Add your own status handling
     switch (status) {
@@ -136,7 +141,10 @@ static void command_status(IotclEventData data, bool status, const char *command
 
     switch(command_type){
         case ECHO:
-            printf("ECHO\r\n");
+            // "echo " == 5
+            printf("%s\r\n",&command_name[5]);
+            success = true;
+            publish_message("last_command",command_name);     
             break;
         case LED:
             printf("LED\r\n");
@@ -154,6 +162,7 @@ static void command_status(IotclEventData data, bool status, const char *command
 
     const char *ack = iotcl_create_ack_string_and_destroy_event(data, success, message);
     printf("command: %s status=%s: %s\n", command_name, status ? "OK" : "Failed", message);
+
     printf("Sent CMD ack: %s\n", ack);
     iotconnect_sdk_send_packet(ack);
     free((void *) ack);
@@ -236,6 +245,22 @@ static void publish_telemetry(sensors_data_t sensors) {
     for (int i = 0; i < sensors.size; i++){
         iotcl_telemetry_set_number(msg, sensors.sensor[i].s_name, sensors.sensor[i].reading);
     }
+
+    const char *str = iotcl_create_serialized_string(msg, false);
+    iotcl_telemetry_destroy(msg);
+    printf("Sending: %s\n", str);
+    iotconnect_sdk_send_packet(str); // underlying code will report an error
+    iotcl_destroy_serialized(str);
+}
+
+
+static void publish_message(const char* key_str,const char* value_str) {
+    IotclMessageHandle msg = iotcl_telemetry_create();
+
+    // Optional. The first time you create a data point, the current timestamp will be automatically added
+    // TelemetryAddWith* calls are only required if sending multiple data points in one packet.
+    iotcl_telemetry_add_with_iso_time(msg, iotcl_iso_timestamp_now());
+    iotcl_telemetry_set_string(msg, key_str, value_str);
 
     const char *str = iotcl_create_serialized_string(msg, false);
     iotcl_telemetry_destroy(msg);
