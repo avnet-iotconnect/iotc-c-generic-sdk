@@ -49,6 +49,11 @@ typedef struct sensors_data {
 
 } sensors_data_t;
 
+typedef enum command_type {
+    ECHO = 1,
+    LED = 2,
+    COMMANDS_END
+} command_type_t;
 
 static void on_connection_status(IotConnectConnectionStatus status) {
     // Add your own status handling
@@ -65,8 +70,89 @@ static void on_connection_status(IotConnectConnectionStatus status) {
     }
 }
 
+static int get_command_type(const char* command_str) {
+
+    int command = 0;
+
+    if (strncmp(command_str, "echo", strlen("echo")) == STRINGS_ARE_EQUAL){
+        command = ECHO;
+    } else if (strncmp(command_str, "led", strlen("led")) == STRINGS_ARE_EQUAL){
+        command = LED;
+    } else {
+        printf("Unknown command\r\n");
+    }
+
+    return command;
+
+}
+
+static int command_led(const char* command_str){
+
+    char* token = NULL;
+
+    token = strtok(command_str, " ");
+
+    int res = 0;
+
+    while(token){
+        printf("token: %s\r\n", token);
+
+        FILE *fd = NULL;
+
+        fd = fopen("/sys/class/leds/usr_led/brightness", "w");
+
+        if (!fd) {
+            printf("failed to open file.\r\n");
+            return 1;
+        }
+
+        res = fputs(token, fd);
+
+        printf("res: %d\r\n", res);
+
+        fclose(fd);
+        if (res == EOF){
+            printf("failed to write. aborting\r\n");
+            return 1;
+        }
+        usleep(3000000); // 3s
+        token = strtok(NULL, " ");
+    }
+
+
+    return 0;
+
+}
+
 static void command_status(IotclEventData data, bool status, const char *command_name, const char *message) {
-    const char *ack = iotcl_create_ack_string_and_destroy_event(data, status, message);
+    
+    
+
+    int command_type = 0;
+
+    bool success = false;
+
+    command_type = get_command_type(command_name);
+
+    switch(command_type){
+        case ECHO:
+            printf("ECHO\r\n");
+            break;
+        case LED:
+            printf("LED\r\n");
+            if (command_led(command_name) != 0) {
+                printf("failed to parse LED command\r\n");
+            } else {
+                success = true;
+            }
+            break;
+        case COMMANDS_END:
+        default:
+            printf("Unsupported command\r\n");
+            break;
+    }
+
+    const char *ack = iotcl_create_ack_string_and_destroy_event(data, success, message);
     printf("command: %s status=%s: %s\n", command_name, status ? "OK" : "Failed", message);
     printf("Sent CMD ack: %s\n", ack);
     iotconnect_sdk_send_packet(ack);
@@ -329,7 +415,7 @@ static int parse_base_params(char** dest, char* json_src, cJSON* json_parser){
 
     //printf("str len: %d:\r\n",str_len);
 
-    *dest = calloc(str_len, sizeof(char));
+    *dest = calloc(str_len+1, sizeof(char));
 
     if (!*dest){
         printf("failed to malloc\r\n");
@@ -388,6 +474,11 @@ static void free_iotc_config(IotConnectClientConfig* iotc_config) {
     if (iotc_config->env){
         free(iotc_config->env);
         iotc_config->env = NULL;
+    }
+
+    if (iotc_config->auth_info.trust_store){
+        free(iotc_config->auth_info.trust_store);
+        iotc_config->auth_info.trust_store = NULL;
     }
 
 
@@ -450,6 +541,10 @@ static int parse_paramaters_json(const char* json_str, IotConnectClientConfig* i
         goto FAIL;
     }
 
+    if (parse_base_params(&iotc_config->auth_info.trust_store, "iotc_server_cert", json_parser) != 0){
+        printf("Failed to get iotc_server_cert from json file. Aborting.\r\n");
+        goto FAIL;
+    }
     
     auth_type = cJSON_GetObjectItemCaseSensitive(json_parser, "auth_type");
 
@@ -485,6 +580,7 @@ static int parse_paramaters_json(const char* json_str, IotConnectClientConfig* i
             printf("Failed to get duid from json file. Aborting.\r\n");
             goto FAIL;
         }
+        printf("SYMMKEY: %s\r\n", iotc_config->auth_info.data.symmetric_key);
     } else {
         //TODO: placeholder for other auth types
     }
@@ -557,7 +653,7 @@ int main(int argc, char *argv[]) {
 
     IotConnectClientConfig *config = iotconnect_sdk_init_and_get_config();
     // leaving this non-modifiable or now
-    config->auth_info.trust_store = IOTCONNECT_SERVER_CERT;
+    // 
 
     if (argc == 2) {
         // assuming only 1 parameters for now
@@ -662,7 +758,7 @@ int main(int argc, char *argv[]) {
         config->env = IOTCONNECT_ENV;
         config->duid = IOTCONNECT_DUID;
         config->auth_info.type = IOTCONNECT_AUTH_TYPE;
-        
+        config->auth_info.trust_store = IOTCONNECT_SERVER_CERT;
 
         if (config->auth_info.type == IOTC_AT_X509) {
             config->auth_info.data.cert_info.device_cert = IOTCONNECT_IDENTITY_CERT;
