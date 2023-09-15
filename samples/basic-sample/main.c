@@ -129,13 +129,18 @@ static int command_led(const char* command_str){
 
 }
 
-static void command_status(IotclEventData data, bool status, const char *command_name, const char *message) {
+static void command_status(IotclEventData data, const char *command_name) {
     
     
 
     int command_type = 0;
 
     bool success = false;
+
+    if (strcmp(command_name, "Internal error") == STRINGS_ARE_EQUAL){
+        printf("Internal error (null ptr command)\r\n");
+        goto END;
+    }
 
     command_type = get_command_type(command_name);
 
@@ -160,9 +165,12 @@ static void command_status(IotclEventData data, bool status, const char *command
             break;
     }
 
-    const char *ack = iotcl_create_ack_string_and_destroy_event(data, success, message);
-    printf("command: %s status=%s: %s\n", command_name, status ? "OK" : "Failed", message);
+END:
 
+    const char* message = success ? "OK" : "Failed_or_not_implemented";
+
+    const char *ack = iotcl_create_ack_string_and_destroy_event(data, success, message);
+    printf("command: %s status=%s: %s\n", command_name, success ? "OK" : "Failed", message);
     printf("Sent CMD ack: %s\n", ack);
     iotconnect_sdk_send_packet(ack);
     free((void *) ack);
@@ -171,10 +179,10 @@ static void command_status(IotclEventData data, bool status, const char *command
 static void on_command(IotclEventData data) {
     char *command = iotcl_clone_command(data);
     if (NULL != command) {
-        command_status(data, false, command, "Not implemented");
+        command_status(data, command);
         free((void *) command);
     } else {
-        command_status(data, false, "?", "Internal error");
+        command_status(data, "Internal error");
     }
 }
 
