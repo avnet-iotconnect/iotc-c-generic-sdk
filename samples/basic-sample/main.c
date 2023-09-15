@@ -136,7 +136,8 @@ static void command_status(IotclEventData data, bool status, const char *command
 
     switch(command_type){
         case ECHO:
-            printf("ECHO\r\n");
+            // "echo " == 5
+            printf("%s\r\n",&command_name[5]);            
             break;
         case LED:
             printf("LED\r\n");
