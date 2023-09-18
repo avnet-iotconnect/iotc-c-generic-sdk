@@ -29,6 +29,7 @@ int usleep(unsigned long usec) {
 #define APP_VERSION "00.01.00"
 #define STRINGS_ARE_EQUAL 0
 
+
 typedef struct cert_struct {
 
     char* x509_id_cert;
@@ -61,7 +62,35 @@ const char *command_strings[] = {
     [LED] = "led ",
 };
 
+#define COMMANDS_STRUCT_ELEM_COUNTER 3
+typedef struct commands {
+
+    char* name;
+    void* f_ptr; // don't use atm?
+    char* private_data;
+
+} commands_t;
+
+typedef struct commands_data {
+
+    int counter;
+    commands_t *commands;
+
+} commands_data_t;
+
+typedef struct local_data {
+
+    char* board_name;
+    sensors_data_t sensors;
+    commands_data_t commands;
+
+} local_data_t;
+
+static local_data_t local_data = {0};
+
 #define DOES_COMMAND_MATCH(input_str, command_enum) (strncmp((input_str), command_strings[(command_enum)], strlen(command_strings[(command_enum)])) == STRINGS_ARE_EQUAL)
+
+static void free_sensor_data(sensors_data_t *sensors);
 
 // MOVE THIS LATER -afk
 static void publish_message(const char* key_str,const char* value_str);
@@ -107,7 +136,6 @@ static int command_led(const char* command_str){
     int res = 0;
 
     while(token){
-        printf("token: %s\r\n", token);
 
         FILE *fd = NULL;
 
@@ -115,8 +143,7 @@ static int command_led(const char* command_str){
 
         if (!fd) {
             printf("failed to open file.\r\n");
-            if (command_str_copy)
-            {
+            if (command_str_copy){
                 free(command_str_copy);
                 command_str_copy = NULL;
             }
@@ -125,13 +152,10 @@ static int command_led(const char* command_str){
 
         res = fputs(token, fd);
 
-        printf("res: %d\r\n", res);
-
         fclose(fd);
         if (res == EOF){
             printf("failed to write. aborting\r\n");
-            if (command_str_copy)
-            {
+            if (command_str_copy){
                 free(command_str_copy);
                 command_str_copy = NULL;
             }
@@ -141,8 +165,7 @@ static int command_led(const char* command_str){
         token = strtok(NULL, " ");
     }
 
-    if (command_str_copy)
-    {
+    if (command_str_copy){
         free(command_str_copy);
         command_str_copy = NULL;
     }
@@ -163,8 +186,7 @@ static void command_status(IotclEventData data, const char *command_name) {
 
     command_type = get_command_type(command_name);
 
-    switch (command_type)
-    {
+    switch (command_type){
     case ECHO:
         printf("%s\r\n", &command_name[strlen(command_strings[ECHO])]);
         publish_message("last_command", command_name);
@@ -172,12 +194,10 @@ static void command_status(IotclEventData data, const char *command_name) {
         break;
     case LED:
         printf("LED\r\n");
-        if (command_led(command_name) != 0)
-        {
+        if (command_led(command_name) != 0){
             printf("failed to parse LED command\r\n");
         }
-        else
-        {
+        else{
             success = true;
         }
         break;
@@ -372,6 +392,7 @@ static int parse_sensors(const cJSON* json_parser, sensors_data_t* sensors){
 
     if (!json_parser || !sensors){
         printf("NULL PTR. Aborting\r\n");
+        return 1;
     }
 
     cJSON *sensor_obj = NULL;
@@ -380,6 +401,8 @@ static int parse_sensors(const cJSON* json_parser, sensors_data_t* sensors){
     cJSON *device_path = NULL;
 
     cJSON *json_array_item = NULL;
+
+    printf("After init\r\n");
 
     sensor_obj = cJSON_GetObjectItem(json_parser, "sensors");
 
@@ -403,6 +426,8 @@ static int parse_sensors(const cJSON* json_parser, sensors_data_t* sensors){
         return 1;
     }
 
+    printf("before loop\r\n");
+
     for (int i = 0; i < sensors->size; i++){
 
         json_array_item = cJSON_GetArrayItem(sensor_obj, i);
@@ -420,6 +445,8 @@ static int parse_sensors(const cJSON* json_parser, sensors_data_t* sensors){
 
         int s_path_len = 0;
         s_path_len = strlen(device_path->valuestring)*(sizeof(char));
+
+        printf("before loop\r\n");
 
         sensors->sensor[i].s_name = calloc(s_name_len, sizeof(char));
 
@@ -483,6 +510,42 @@ static int parse_base_params(char** dest, char* json_src, cJSON* json_parser){
     dest[str_len] = '\0';
 
     return 0;
+}
+
+static void free_local_data() {
+
+    printf("freeing local data\r\n");
+
+    for (int i = 0; i < local_data.commands.counter; i++){
+        if (local_data.commands.commands[i].f_ptr){
+            free(local_data.commands.commands[i].f_ptr);
+            local_data.commands.commands[i].f_ptr = NULL;
+        }
+
+        if (local_data.commands.commands[i].name){
+            free(local_data.commands.commands[i].name);
+            local_data.commands.commands[i].name = NULL;
+        }
+
+        if (local_data.commands.commands[i].private_data){
+            free(local_data.commands.commands[i].private_data);
+            local_data.commands.commands[i].private_data = NULL;
+        }
+
+    }
+
+    if (local_data.commands.commands){
+        free(local_data.commands.commands);
+        local_data.commands.commands = NULL;
+    }
+
+    if (local_data.board_name){
+        free(local_data.board_name);
+        local_data.board_name = NULL;
+    }
+
+    free_sensor_data(&local_data.sensors);
+
 }
 
 static void free_sensor_data(sensors_data_t *sensors) {
@@ -557,8 +620,100 @@ static void free_iotc_config(IotConnectClientConfig* iotc_config) {
 
 }
 
+static int parse_commands(cJSON *json_parser, commands_data_t *commands){
+
+    int ret = 0;
+
+    cJSON *commands_obj = NULL;
+    cJSON *json_array_item = NULL;
+
+    commands_obj = cJSON_GetObjectItem(json_parser, "commands");
+
+    if (!commands_obj){
+        printf("Failed to get sensor object. Aborting\n");
+        cJSON_Delete(commands_obj);
+        return 1;
+    }
+
+    commands->counter = cJSON_GetArraySize(commands_obj);
+
+    if (commands->counter <= 0) {
+        printf("Failed to get array size\r\n");
+        cJSON_Delete(commands_obj);
+        return 1;
+    }
+
+    commands->commands = calloc(commands->counter, sizeof(commands_t));
+
+    if (!commands->commands){
+        printf("failed to allocate\r\n");
+        cJSON_Delete(commands_obj);
+        return 1;
+    }
+
+    for (int i = 0; i < commands->counter; i++){
+
+        json_array_item = cJSON_GetArrayItem(commands_obj, i);
+
+        if (!json_array_item){
+            printf("Failed to access element %d of json sensor array\r\n", i);
+            cJSON_Delete(commands_obj);
+            return 1;
+        }
+
+        if (parse_base_params(&commands->commands[i].name , "name", json_array_item) != 0){
+            printf("Failed to get command name n%d from json file. Aborting.\r\n", i);
+            ret = 1;
+            break;
+        }
+
+        if (parse_base_params(&commands->commands[i].f_ptr , "function", json_array_item) != 0){
+            printf("Failed to get command function n%d from json file. Aborting.\r\n", i);
+            ret = 1;
+            break;
+        }
+
+        if (parse_base_params(&commands->commands[i].private_data , "private_data", json_array_item) != 0){
+            printf("Failed to get command private data n%d from json file. Aborting.\r\n", i);
+            ret = 1;
+            break;
+        }
+        
+    }
+
+    return ret;
+}
+
+static int parse_telemetry_settings(cJSON *json_parser){
+
+    cJSON *telemetry_parser = NULL;
+    
+    telemetry_parser = cJSON_GetObjectItem(json_parser, "telemetry");
+
+    if (!telemetry_parser) {
+        printf("Failed to get telemetry obj.\r\n");
+        return 1;
+    }
+
+    printf("Here\r\n");
+
+    //TODO; maybe rethink this
+    if (cJSON_HasObjectItem(telemetry_parser, "sensors") == true){
+        if (parse_sensors(telemetry_parser, &local_data.sensors) != 0){
+            printf("failed to parse sensor. Aborting\r\n");
+            cJSON_Delete(telemetry_parser);
+        }
+        printf("after sensors\r\n");
+        //printf("sensor data: name - %s; path - %s\r\n", sensor->s_name, sensor->s_path);
+    }
+
+    //cJSON_Delete(telemetry_parser);
+    return 0;
+
+}
+
 //TODO: add error checking
-static int parse_paramaters_json(const char* json_str, IotConnectClientConfig* iotc_config, sensors_data_t* sensors){
+static int parse_paramaters_json(const char* json_str, IotConnectClientConfig* iotc_config){
 
     if (!json_str){
         printf("NULL PTR. Aborting\n");
@@ -640,14 +795,44 @@ static int parse_paramaters_json(const char* json_str, IotConnectClientConfig* i
         //TODO: placeholder for other auth types
     }
 
-    //TODO; maybe rethink this
-    if (cJSON_HasObjectItem(json_parser, "sensors") == true){
-        if (parse_sensors(json_parser, sensors) != 0){
-            printf("failed to parse sensor. Aborting\r\n");
+    cJSON *device_parser = NULL; 
+
+    if (cJSON_HasObjectItem(json_parser, "device") == true){
+
+        device_parser = cJSON_GetObjectItem(json_parser, "device");
+
+        if (!device_parser){
+            printf("Failed to get device object from json\r\n");
             goto FAIL;
         }
+
+
+
+        if (parse_base_params(&local_data.board_name, "name", device_parser) != 0) {
+            printf("failed to get board name\r\n");
+            goto FAIL;
+        }
+
+
+
+        if (parse_telemetry_settings(device_parser) != 0){
+            printf("Failed to parse telemetry settings\r\n");
+            goto FAIL;
+        }
+
+        if (cJSON_HasObjectItem(device_parser, "commands") == true){
+
+        if (parse_commands(device_parser, &local_data.commands) != 0){
+            printf("failed to parse commands. Aborting\r\n");
+            cJSON_Delete(device_parser);
+        }
+
         //printf("sensor data: name - %s; path - %s\r\n", sensor->s_name, sensor->s_path);
     }
+
+
+    }
+
     
 
 
@@ -657,7 +842,8 @@ static int parse_paramaters_json(const char* json_str, IotConnectClientConfig* i
 FAIL:
 
     free_iotc_config(iotc_config);
-    free_sensor_data(sensors);
+    free_local_data();
+    //free_sensor_data(sensors);
 
     cJSON_Delete(json_parser);
     return 1;
@@ -713,6 +899,8 @@ int main(int argc, char *argv[]) {
     if (argc == 2) {
         // assuming only 1 parameters for now
            
+        local_data.commands.counter = 0;
+
         char * s = NULL;
         s = strstr(argv[1], ".json");
         if (!s) {
@@ -761,7 +949,7 @@ int main(int argc, char *argv[]) {
 
         fclose(fd);
 
-        if (parse_paramaters_json(json_str, config, &sensors) != 0) {
+        if (parse_paramaters_json(json_str, config) != 0) {
             printf("Failed to parse input JSON file. Aborting\n");
             if (json_str) {
                 free(json_str);
@@ -789,11 +977,16 @@ int main(int argc, char *argv[]) {
             }
         }
         
-        /*
-        for (int i = 0; i < sensors.size; i++){
-            printf("id: %d;\n name %s;\n path %s;\r\n_____________\r\n", i, sensors.sensor[i].s_name, sensors.sensor[i].s_path);
+    
+        for (int i = 0; i < local_data.sensors.size; i++){
+            printf("id: %d;\n name %s;\n path %s;\r\n_____________\r\n", i, local_data.sensors.sensor[i].s_name, local_data.sensors.sensor[i].s_path);
         }
-        */
+
+        for (int i = 0; i < local_data.commands.counter; i++) {
+            printf("name: %s\r\nfunction: %s\r\nprivate_data: %s\r\n", local_data.commands.commands[i].name, (char*)local_data.commands.commands[i].f_ptr, local_data.commands.commands[i].private_data);
+        }
+
+
 
     } else {
         
@@ -846,11 +1039,11 @@ int main(int argc, char *argv[]) {
 
         // send 10 messages
         for (int i = 0; iotconnect_sdk_is_connected() && i < 10; i++) {
-            for (int i = 0; i < sensors.size; i++){
-                sensors.sensor[i].reading = read_sensor(sensors.sensor[i]);
+            for (int i = 0; i < local_data.sensors.size; i++){
+                local_data.sensors.sensor[i].reading = read_sensor(local_data.sensors.sensor[i]);
             }
                 
-            publish_telemetry(sensors);
+            publish_telemetry(local_data.sensors);
             // repeat approximately evey ~5 seconds
             for (int k = 0; k < 500; k++) {
                 iotconnect_sdk_receive();
@@ -861,7 +1054,8 @@ int main(int argc, char *argv[]) {
     }
 
     free_iotc_config(config);
-    free_sensor_data(&sensors);
+    //free_sensor_data(&sensors);
+    free_local_data();
 
     return 0;
 }
