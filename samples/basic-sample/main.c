@@ -49,13 +49,19 @@ typedef struct sensors_data {
 
 } sensors_data_t;
 
-typedef enum command_type {
+typedef enum command_type
+{
     ECHO = 1,
     LED = 2,
     COMMANDS_END
 } command_type_t;
 
-#define IS_VALID_COMMAND(x) ((x) > COMMAND_NULL && (x) < COMMANDS_END)
+const char *command_strings[] = {
+    [ECHO] = "echo ",
+    [LED] = "led ",
+};
+
+#define DOES_COMMAND_MATCH(input_str, command_enum) (strncmp((input_str), command_strings[(command_enum)], strlen(command_strings[(command_enum)])) == STRINGS_ARE_EQUAL)
 
 // MOVE THIS LATER -afk
 static void publish_message(const char* key_str,const char* value_str);
@@ -79,9 +85,9 @@ static int get_command_type(const char* command_str) {
 
     int command = 0;
 
-    if (strncmp(command_str, "echo", strlen("echo")) == STRINGS_ARE_EQUAL){
+    if (DOES_COMMAND_MATCH(command_str, ECHO)){
         command = ECHO;
-    } else if (strncmp(command_str, "led", strlen("led")) == STRINGS_ARE_EQUAL){
+    } else if (DOES_COMMAND_MATCH(command_str, LED)){
         command = LED;
     } else {
         printf("Unknown command\r\n");
@@ -93,9 +99,10 @@ static int get_command_type(const char* command_str) {
 
 static int command_led(const char* command_str){
 
+    char* command_str_copy = strdup(command_str);
     char* token = NULL;
 
-    token = strtok(command_str, " ");
+    token = strtok(command_str_copy, " ");
 
     int res = 0;
 
@@ -108,6 +115,11 @@ static int command_led(const char* command_str){
 
         if (!fd) {
             printf("failed to open file.\r\n");
+            if (command_str_copy)
+            {
+                free(command_str_copy);
+                command_str_copy = NULL;
+            }
             return 1;
         }
 
@@ -118,20 +130,27 @@ static int command_led(const char* command_str){
         fclose(fd);
         if (res == EOF){
             printf("failed to write. aborting\r\n");
+            if (command_str_copy)
+            {
+                free(command_str_copy);
+                command_str_copy = NULL;
+            }
             return 1;
         }
         usleep(3000000); // 3s
         token = strtok(NULL, " ");
     }
 
-
+    if (command_str_copy)
+    {
+        free(command_str_copy);
+        command_str_copy = NULL;
+    }
     return 0;
 
 }
 
 static void command_status(IotclEventData data, const char *command_name) {
-    
-    
 
     int command_type = 0;
 
@@ -144,25 +163,28 @@ static void command_status(IotclEventData data, const char *command_name) {
 
     command_type = get_command_type(command_name);
 
-    switch(command_type){
-        case ECHO:
-            // "echo " == 5
-            printf("%s\r\n",&command_name[5]);
+    switch (command_type)
+    {
+    case ECHO:
+        printf("%s\r\n", &command_name[strlen(command_strings[ECHO])]);
+        publish_message("last_command", command_name);
+        success = true;
+        break;
+    case LED:
+        printf("LED\r\n");
+        if (command_led(command_name) != 0)
+        {
+            printf("failed to parse LED command\r\n");
+        }
+        else
+        {
             success = true;
-            publish_message("last_command",command_name);     
-            break;
-        case LED:
-            printf("LED\r\n");
-            if (command_led(command_name) != 0) {
-                printf("failed to parse LED command\r\n");
-            } else {
-                success = true;
-            }
-            break;
-        case COMMANDS_END:
-        default:
-            printf("Unsupported command\r\n");
-            break;
+        }
+        break;
+    default:
+        success = false;
+        printf("Unsupported command\r\n");
+        break;
     }
 
 END:
@@ -173,7 +195,7 @@ END:
     printf("command: %s status=%s: %s\n", command_name, success ? "OK" : "Failed", message);
     printf("Sent CMD ack: %s\n", ack);
     iotconnect_sdk_send_packet(ack);
-    free((void *) ack);
+    free((void *)ack);
 }
 
 static void on_command(IotclEventData data) {
