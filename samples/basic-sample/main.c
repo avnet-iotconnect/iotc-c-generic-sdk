@@ -485,31 +485,26 @@ static int parse_base_params(char** dest, char* json_src, cJSON* json_parser){
         return 1;
     }
 
-    cJSON* req_json_str = NULL;
-
-
-    req_json_str = cJSON_GetObjectItemCaseSensitive(json_parser, json_src);
-
+    cJSON* req_json_str = cJSON_GetObjectItemCaseSensitive(json_parser, json_src);
     if (!req_json_str) {
         printf("Failed to get %s from json. Aborting\n\r", json_src);
         return 1;
     }
-    int str_len = 0;
-    str_len = strlen(req_json_str->valuestring)*(sizeof(char));
 
-    //printf("str len: %d:\r\n",str_len);
-
-    *dest = calloc(str_len+1, sizeof(char));
-
+    *dest = strdup(req_json_str->valuestring);
     if (!*dest){
-        printf("failed to malloc\r\n");
+        printf("failed to allocate memory for string %s\r\n", __func__);
         *dest = NULL;
         return 1;
     }
 
-    memcpy(*dest, req_json_str->valuestring, sizeof(char)*str_len);
-    //printf("copied: %s\r\n", *dest);
-    dest[str_len] = '\0';
+    if (strcmp(*dest, req_json_str->valuestring) != 0)
+    {
+        printf("copied string mismatch %s\r\n", __func__);
+        *dest = NULL;
+        return 1;
+    }
+
 
     return 0;
 }
