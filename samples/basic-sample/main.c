@@ -901,6 +901,12 @@ static int read_sensor(sensor_info_t sensor_data){
     return reading;
 }
 
+static bool string_ends_with(const char * needle, const char* haystack)
+{
+    const char *str_end = haystack + strlen(haystack) -  strlen(needle);
+    return (strncmp(str_end, needle, strlen(needle) ) == 0);
+}
+
 int main(int argc, char *argv[]) {
     if (access(IOTCONNECT_SERVER_CERT, F_OK) != 0) {
         fprintf(stderr, "Unable to access IOTCONNECT_SERVER_CERT. "
@@ -919,14 +925,12 @@ int main(int argc, char *argv[]) {
 
     if (argc == 2) {
         // assuming only 1 parameters for now
-           
         local_data.commands.counter = 0;
 
-        char * s = NULL;
-        s = strstr(argv[1], ".json");
-        if (!s) {
-            printf("String .json not found inside of %s\n", argv[1]);
-            return 1;
+        if (!string_ends_with(".json", argv[1]))
+        {
+            printf("File extension is not .json of filename %s\n", argv[1]);
+            return EXIT_FAILURE;
         }
     
         input_json_file = argv[1];
@@ -938,12 +942,12 @@ int main(int argc, char *argv[]) {
             return 1;
         }
 
-        FILE *fd = NULL;
-
-
-        
-        fd = fopen(input_json_file, "r");
-
+        FILE *fd = fopen(input_json_file, "r");
+        if (!fd)
+        {
+            printf("File failed to open - %s", input_json_file);
+            return EXIT_FAILURE;
+        }
         fseek(fd, 0l, SEEK_END);
         long file_len = ftell(fd);
 
