@@ -369,6 +369,8 @@ static int parse_x509_certs(const cJSON* json_parser, char** id_key, char** id_c
 
     printf("auth type: %s\n", x509_obj->valuestring);
 
+    
+
     // TODO: add error checking
     x509_id_cert = cJSON_GetObjectItemCaseSensitive(x509_obj, "client_cert");
     x509_id_key = cJSON_GetObjectItemCaseSensitive(x509_obj, "client_key");
@@ -430,8 +432,6 @@ static int parse_sensors(const cJSON* json_parser, sensors_data_t* sensors){
 
     cJSON *json_array_item = NULL;
 
-    printf("After init\r\n");
-
     sensor_obj = cJSON_GetObjectItem(json_parser, "sensors");
 
     if (!sensor_obj){
@@ -453,8 +453,6 @@ static int parse_sensors(const cJSON* json_parser, sensors_data_t* sensors){
         printf("failed to allocate\r\n");
         return 1;
     }
-
-    printf("before loop\r\n");
 
     for (int i = 0; i < sensors->size; i++){
 
@@ -488,6 +486,7 @@ static int parse_base_params(char** dest, char* json_src, cJSON* json_parser){
     }
 
     cJSON* req_json_str = NULL;
+
 
     req_json_str = cJSON_GetObjectItemCaseSensitive(json_parser, json_src);
 
@@ -658,7 +657,7 @@ static int parse_commands(cJSON *json_parser, commands_data_t *commands){
             return 1;
         }
 
-        if (parse_base_params(&commands->commands[i].name , "name", json_array_item) != 0){
+        if (parse_base_params(&commands->commands[i].name, "name", json_array_item) != 0){
             printf("Failed to get command name n%d from json file. Aborting.\r\n", i);
             return 1;
         }
@@ -670,7 +669,7 @@ static int parse_commands(cJSON *json_parser, commands_data_t *commands){
         }
 #endif
 
-        if (parse_base_params(&commands->commands[i].private_data , "private_data", json_array_item) != 0){
+        if (parse_base_params(&commands->commands[i].private_data, "private_data", json_array_item) != 0){
             printf("Failed to get command private data n%d from json file. Aborting.\r\n", i);
             return 1;
         }
@@ -785,19 +784,29 @@ static int parse_paramaters_json(const char* json_str, IotConnectClientConfig* i
         goto FAIL;
     }
 
-    if (iotc_config->auth_info.type == IOTC_AT_X509 && cJSON_HasObjectItem(json_parser, "x509_certs") == true){
-        if (parse_x509_certs(json_parser, &iotc_config->auth_info.data.cert_info.device_key,&iotc_config->auth_info.data.cert_info.device_cert) != 0) {
-            printf("failed to parse x509 certs. Aborting\r\n");
-            return 1;
-        }
-        
+    //return 1;
+    if (iotc_config->auth_info.type == IOTC_AT_X509){
 
-    } else if (iotc_config->auth_info.type == IOTC_AT_SYMMETRIC_KEY && cJSON_HasObjectItem(json_parser, "symmkey") == true){
-        if (parse_base_params(&iotc_config->auth_info.data.symmetric_key, "symmkey", json_parser) != 0){
-            printf("Failed to get duid from json file. Aborting.\r\n");
-            goto FAIL;
+        if (cJSON_HasObjectItem(json_parser, "x509_certs") == true){
+            
+            
+            if (parse_x509_certs(json_parser, &iotc_config->auth_info.data.cert_info.device_key,&iotc_config->auth_info.data.cert_info.device_cert) != 0) {
+                printf("failed to parse x509 certs. Aborting\r\n");
+                return 1;
+            }
         }
-        printf("SYMMKEY: %s\r\n", iotc_config->auth_info.data.symmetric_key);
+
+    } else if (iotc_config->auth_info.type == IOTC_AT_SYMMETRIC_KEY) {
+        
+        if (cJSON_HasObjectItem(json_parser, "symmkey") == true){
+            //return 1;
+            if (parse_base_params(&iotc_config->auth_info.data.symmetric_key, "symmkey", json_parser) != 0){
+                printf("Failed to get duid from json file. Aborting.\r\n");
+                goto FAIL;
+            }
+
+            printf("SYMMKEY: %s\r\n", iotc_config->auth_info.data.symmetric_key);
+        }
     } else {
         //TODO: placeholder for other auth types
     }
@@ -841,8 +850,6 @@ static int parse_paramaters_json(const char* json_str, IotConnectClientConfig* i
     }
 
     
-
-
     cJSON_Delete(json_parser);
     return 0;
 
