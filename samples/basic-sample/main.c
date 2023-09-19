@@ -28,6 +28,7 @@ int usleep(unsigned long usec) {
 
 #define APP_VERSION "00.01.00"
 #define STRINGS_ARE_EQUAL 0
+#define FREE(x) if ((x)) { free(x); (x) = NULL; }
 
 #undef COMMAND_FUNCTION_PTR_PARSING
 
@@ -156,10 +157,7 @@ static int command_led(const char* command_str){
     }
     if (pos == -1){
         printf("Failed to find led command in config?\r\n");
-        if (command_str_copy){
-            free(command_str_copy);
-            command_str_copy = NULL;
-        }
+        FREE(command_str_copy);
         return 1;
     }
 
@@ -171,10 +169,7 @@ static int command_led(const char* command_str){
 
         if (!fd) {
             printf("failed to open file.\r\n");
-            if (command_str_copy){
-                free(command_str_copy);
-                command_str_copy = NULL;
-            }
+            FREE(command_str_copy);
             return 1;
         }
 
@@ -183,20 +178,14 @@ static int command_led(const char* command_str){
         fclose(fd);
         if (res == EOF){
             printf("failed to write. aborting\r\n");
-            if (command_str_copy){
-                free(command_str_copy);
-                command_str_copy = NULL;
-            }
+            FREE(command_str_copy);
             return 1;
         }
         usleep(3000000); // 3s
         token = strtok(NULL, " ");
     }
 
-    if (command_str_copy){
-        free(command_str_copy);
-        command_str_copy = NULL;
-    }
+    FREE(command_str_copy);
     return 0;
 
 }
