@@ -703,7 +703,7 @@ static int parse_telemetry_settings(cJSON *json_parser){
 }
 
 //TODO: add error checking
-static int parse_paramaters_json(const char* json_str, IotConnectClientConfig* iotc_config){
+static int parse_parameters_json(const char* json_str, IotConnectClientConfig* iotc_config){
 
     if (!json_str){
         printf("NULL PTR. Aborting\n");
@@ -951,7 +951,7 @@ int main(int argc, char *argv[]) {
 
         fclose(fd);
 
-        if (parse_paramaters_json(json_str, config) != 0) {
+        if (parse_parameters_json(json_str, config) != 0) {
             printf("Failed to parse input JSON file. Aborting\n");
             if (json_str != NULL) {
                 free(json_str);
