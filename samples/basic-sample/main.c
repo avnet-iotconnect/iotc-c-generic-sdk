@@ -29,6 +29,7 @@ int usleep(unsigned long usec) {
 #define APP_VERSION "00.01.00"
 #define STRINGS_ARE_EQUAL 0
 
+#undef COMMAND_FUNCTION_PTR_PARSING
 
 typedef struct cert_struct {
 
@@ -62,6 +63,7 @@ const char *command_strings[] = {
     [LED] = "led ",
 };
 
+#ifdef COMMAND_FUNCTION_PTR_PARSING
 #define COMMANDS_STRUCT_ELEM_COUNTER 3
 typedef struct commands {
 
@@ -70,6 +72,15 @@ typedef struct commands {
     char* private_data;
 
 } commands_t;
+#else
+#define COMMANDS_STRUCT_ELEM_COUNTER 2
+typedef struct commands {
+
+    char* name;
+    char* private_data;
+
+} commands_t;
+#endif
 
 typedef struct commands_data {
 
@@ -91,6 +102,8 @@ static local_data_t local_data = {0};
 #define DOES_COMMAND_MATCH(input_str, command_enum) (strncmp((input_str), command_strings[(command_enum)], strlen(command_strings[(command_enum)])) == STRINGS_ARE_EQUAL)
 
 static void free_sensor_data(sensors_data_t *sensors);
+static int parse_base_params(char** dest, char* json_src, cJSON* json_parser);
+
 
 // MOVE THIS LATER -afk
 static void publish_message(const char* key_str,const char* value_str);
@@ -452,41 +465,16 @@ static int parse_sensors(const cJSON* json_parser, sensors_data_t* sensors){
             return 1;
         }
 
-        device_name = cJSON_GetObjectItemCaseSensitive(json_array_item, "name");
-        device_path = cJSON_GetObjectItemCaseSensitive(json_array_item, "path");    
-
-        int s_name_len = 0;
-        s_name_len = strlen(device_name->valuestring)*(sizeof(char));
-
-        int s_path_len = 0;
-        s_path_len = strlen(device_path->valuestring)*(sizeof(char));
-
-        printf("before loop\r\n");
-
-        sensors->sensor[i].s_name = calloc(s_name_len, sizeof(char));
-
-        if (!sensors->sensor[i].s_name){
-            printf("failed to malloc\r\n");
-            sensors->sensor[i].s_name = NULL;
+        if (parse_base_params(&sensors->sensor[i].s_name, "name", json_array_item) != 0){
+            printf("Failed to get sensor name n%d from json file. Aborting.\r\n", i);
             return 1;
         }
 
-
-        sensors->sensor[i].s_path = calloc(s_path_len, sizeof(char));
-
-
-        if (!sensors->sensor[i].s_path){
-            printf("failed to malloc\r\n");
-            sensors->sensor[i].s_path = NULL;
+        if (parse_base_params(&sensors->sensor[i].s_path, "path", json_array_item) != 0){
+            printf("Failed to get sensor path n%d from json file. Aborting.\r\n", i);
             return 1;
         }
 
-        memcpy(sensors->sensor[i].s_name, device_name->valuestring, sizeof(char)*s_name_len);
-
-        memcpy(sensors->sensor[i].s_path, device_path->valuestring, sizeof(char)*s_path_len);
-
-        sensors->sensor[i].s_name[s_name_len] = '\0';
-        sensors->sensor[i].s_path[s_path_len] = '\0';
 
     }
 
@@ -532,10 +520,13 @@ static void free_local_data() {
     printf("freeing local data\r\n");
 
     for (int i = 0; i < local_data.commands.counter; i++){
+        
+#ifdef COMMAND_FUNCTION_PTR_PARSING
         if (local_data.commands.commands[i].f_ptr){
             free(local_data.commands.commands[i].f_ptr);
             local_data.commands.commands[i].f_ptr = NULL;
         }
+#endif
 
         if (local_data.commands.commands[i].name){
             free(local_data.commands.commands[i].name);
@@ -547,11 +538,6 @@ static void free_local_data() {
             local_data.commands.commands[i].private_data = NULL;
         }
 
-    }
-
-    if (local_data.commands.commands){
-        free(local_data.commands.commands);
-        local_data.commands.commands = NULL;
     }
 
     if (local_data.board_name){
@@ -677,10 +663,12 @@ static int parse_commands(cJSON *json_parser, commands_data_t *commands){
             return 1;
         }
 
+#ifdef COMMAND_FUNCTION_PTR_PARSING
         if (parse_base_params(&commands->commands[i].f_ptr , "function", json_array_item) != 0){
             printf("Failed to get command function n%d from json file. Aborting.\r\n", i);
             return 1;
         }
+#endif
 
         if (parse_base_params(&commands->commands[i].private_data , "private_data", json_array_item) != 0){
             printf("Failed to get command private data n%d from json file. Aborting.\r\n", i);
@@ -716,7 +704,6 @@ static int parse_telemetry_settings(cJSON *json_parser){
         return 1;
     }
 
-    printf("Here\r\n");
 
     //TODO; maybe rethink this
     if (cJSON_HasObjectItem(telemetry_parser, "sensors") == true){
@@ -724,7 +711,6 @@ static int parse_telemetry_settings(cJSON *json_parser){
             printf("failed to parse sensor. Aborting\r\n");
             cJSON_Delete(telemetry_parser);
         }
-        printf("after sensors\r\n");
         //printf("sensor data: name - %s; path - %s\r\n", sensor->s_name, sensor->s_path);
     }
 
@@ -845,7 +831,7 @@ static int parse_paramaters_json(const char* json_str, IotConnectClientConfig* i
 
         if (parse_commands(device_parser, &local_data.commands) != 0){
             printf("failed to parse commands. Aborting\r\n");
-            cJSON_Delete(device_parser);
+            goto FAIL;
         }
 
         //printf("sensor data: name - %s; path - %s\r\n", sensor->s_name, sensor->s_path);
@@ -976,13 +962,13 @@ int main(int argc, char *argv[]) {
 
         if (parse_paramaters_json(json_str, config) != 0) {
             printf("Failed to parse input JSON file. Aborting\n");
-            if (json_str) {
+            if (json_str != NULL) {
                 free(json_str);
                 json_str = NULL;
             }
             return 1;
         }
-
+        
         printf("DUID in main: %s\r\n", config->duid);
 
         
@@ -1002,15 +988,20 @@ int main(int argc, char *argv[]) {
             }
         }
         
-    
+        /*
         for (int i = 0; i < local_data.sensors.size; i++){
             printf("id: %d;\n name %s;\n path %s;\r\n_____________\r\n", i, local_data.sensors.sensor[i].s_name, local_data.sensors.sensor[i].s_path);
         }
+        */
 
+#ifdef COMMAND_FUNCTION_PTR_PARSING
+
+/*
         for (int i = 0; i < local_data.commands.counter; i++) {
-            printf("name: %s\r\nfunction: %s\r\nprivate_data: %s\r\n", local_data.commands.commands[i].name, (char*)local_data.commands.commands[i].f_ptr, local_data.commands.commands[i].private_data);
+            printf("name: %s\r\nprivate_data: %s\r\n", local_data.commands.commands[i].name, (char*)local_data.commands.commands[i].f_ptr, local_data.commands.commands[i].private_data);
         }
-
+*/
+#endif
 
 
     } else {
