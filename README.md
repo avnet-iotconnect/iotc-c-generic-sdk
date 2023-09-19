@@ -53,27 +53,39 @@ You can also pass a json file parameter to `basic-sample` - for example `basic-s
 Current expected JSON format is:
 ```json
 {
-    "duid": "azRTOS-demo-blueboard",
+    "duid": "demo-maax",
     "cpid": "av",
     "env": "avn",
     "auth_type": "IOTC_AT_SYMMETRIC_KEY",
     "symmkey": "UN0TwIaNf4LOOQVt79t3rw==",
-    "sensors": [{
-        "name": "light_sensor",
-        "path": "/home/some_file_to_read"
-    },
-    {
-        "name": "test_sensor",
-        "path": "/home/some_file_to_read_v3"
-    },
-    {
-        "name": "nonsense-sensor",
-        "path": "/home/some_file_to_read_v2"
-    }]
+    "iotc_server_cert": "/etc/ssl/certs/server.pem",
+    "device": {
+        "name": "maaxboardt",
+        "telemetry":{
+            "sensors": [{
+                "name": "light_sensor",
+                "path": "/home/some_file_to_read"
+            },
+            {
+                "name": "test_sensor",
+                "path": "/home/some_file_to_read_v3"
+            },
+            {
+                "name": "nonsense-sensor",
+                "path": "/home/some_file_to_read_v2"
+            }]
+        },
+        "commands":[
+            {
+                "name":"led",
+                "private_data": "/sys/class/leds/usr_led/brightness"
+            }
+        ]           
+    }
 }
 ```
 
-Where `duid`, `cpid`, `env` and `auth_type` fields are mandatory.
+Where `duid`, `cpid`, `env`, `auth_type` and `iotc_server_cert` fields are mandatory.
 Depending on `auth_type` some other fields become mandatory too.
 In example above, because `auth_type` is set to `IOTC_AT_SYMMETRIC_KEY`, `symmkey` field is required too.
 If `auth_type` is set to `IOTC_AT_X509` a `x509_certs` object is required. See example below.
@@ -88,17 +100,26 @@ If `auth_type` is set to `IOTC_AT_X509` a `x509_certs` object is required. See e
         "client_key": "/home/client1-key.pem",
         "client_cert": "/home/client1.pem"
     },
-    "sensors": [{
-        "name": "light_sensor",
-        "path": "/home/some_file_to_read"
-    },
-    {
-        "name": "test_sensor",
-        "path": "/home/some_file_to_read_v3"
-    }]
+    "device": {
+        "name": "maaxboardt",
+        "commands":[
+            {
+                "name":"led",
+                "private_data": "/sys/class/leds/usr_led/brightness"
+            }
+        ]           
+    }
 }
 ```
 
-Currently the only types implemented with proper parsing are `IOTC_AT_X509` and `IOTC_AT_SYMMETRIC_KEY`. (`IOTC_AT_TOKEN` will probably also work without changing anything, but it needs to be tested).
-`sensors` object is always optional, but, if present, it must be a JSON array.
+Currently the only types implemented with proper parsing are `IOTC_AT_X509` and `IOTC_AT_SYMMETRIC_KEY`. (`IOTC_AT_TOKEN` works without changing anything, no additional fields are required).
+
+ - `device` object is always optional.
+ - - if `device` is specified - `name` field is mandatory.
+ - - `telemetry` object is optional.
+ - - - `sensors` object is optional, but, if present, it must be a JSON array.
+ - - - - `sensors` array element must consist of 2 fields: `name` and `path`.
+ - - `commands` object is optional, but, if present, it must be a JSON array.
+ - - - `commands` array element must consist of 2 fields: `name` and `private_data`.
+ 
 ***NOTE:*** spaces in `name` fields for `sensors` array are causing problems at the moment (data is being sent, but doesn’t appear on IoTC dashboard). So, avoid using spaces.
