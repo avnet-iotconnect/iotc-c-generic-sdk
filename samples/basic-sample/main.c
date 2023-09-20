@@ -175,7 +175,33 @@ int main(int argc, char *argv[]) {
     config->cmd_cb = on_command;
 
 
-    // run a dozen connect/send/disconnect cycles with each cycle being about a minute
+    int ret = iotconnect_sdk_init();
+    if (0 != ret) {
+        fprintf(stderr, "IoTConnect exited with error code %d\n", ret);
+        return ret;
+    }    
+
+    // run infinitely if connection is successful
+    while (1){
+        while (iotconnect_sdk_is_connected()){
+            publish_telemetry();
+            // repeat approximately evey ~5 seconds
+            for (int k = 0; k < 500; k++) {
+                iotconnect_sdk_receive();
+                usleep(10000); // 10ms
+            }
+        }
+
+        ret = iotconnect_sdk_init();
+        if (0 != ret) {
+            fprintf(stderr, "IoTConnect exited with error code %d\n", ret);
+            return ret;
+        }    
+
+        usleep(100000); // 1s
+    }
+
+    /*
     for (int j = 0; j < 10; j++) {
         int ret = iotconnect_sdk_init();
         if (0 != ret) {
@@ -194,6 +220,8 @@ int main(int argc, char *argv[]) {
         }
         iotconnect_sdk_disconnect();
     }
+    */
+
 
     return 0;
 }
