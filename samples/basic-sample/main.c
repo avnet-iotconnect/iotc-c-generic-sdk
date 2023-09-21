@@ -31,21 +31,21 @@ static void on_connection_status(IotConnectConnectionStatus status) {
     // Add your own status handling
     switch (status) {
         case IOTC_CS_MQTT_CONNECTED:
-            printf("IoTConnect Client Connected\n");
+            fprintf(stdout, "IoTConnect Client Connected\n");
             break;
         case IOTC_CS_MQTT_DISCONNECTED:
-            printf("IoTConnect Client Disconnected\n");
+            fprintf(stdout, "IoTConnect Client Disconnected\n");
             break;
         default:
-            printf("IoTConnect Client ERROR\n");
+            fprintf(stdout, "IoTConnect Client ERROR\n");
             break;
     }
 }
 
 static void command_status(IotclEventData data, bool status, const char *command_name, const char *message) {
     const char *ack = iotcl_create_ack_string_and_destroy_event(data, status, message);
-    printf("command: %s status=%s: %s\n", command_name, status ? "OK" : "Failed", message);
-    printf("Sent CMD ack: %s\n", ack);
+    fprintf(stdout, "command: %s status=%s: %s\n", command_name, status ? "OK" : "Failed", message);
+    fprintf(stdout, "Sent CMD ack: %s\n", ack);
     iotconnect_sdk_send_packet(ack);
     free((void *) ack);
 }
@@ -73,18 +73,18 @@ static void on_ota(IotclEventData data) {
     char *url = iotcl_clone_download_url(data, 0);
     bool success = false;
     if (NULL != url) {
-        printf("Download URL is: %s\n", url);
+        fprintf(stdout, "Download URL is: %s\n", url);
         const char *version = iotcl_clone_sw_version(data);
         if (is_app_version_same_as_ota(version)) {
-            printf("OTA request for same version %s. Sending success\n", version);
+            fprintf(stdout, "OTA request for same version %s. Sending success\n", version);
             success = true;
             message = "Version is matching";
         } else if (app_needs_ota_update(version)) {
-            printf("OTA update is required for version %s.\n", version);
+            fprintf(stdout, "OTA update is required for version %s.\n", version);
             success = false;
             message = "Not implemented";
         } else {
-            printf("Device firmware version %s is newer than OTA version %s. Sending failure\n", APP_VERSION,
+            fprintf(stdout, "Device firmware version %s is newer than OTA version %s. Sending failure\n", APP_VERSION,
                    version);
             // Not sure what to do here. The app version is better than OTA version.
             // Probably a development version, so return failure?
@@ -101,14 +101,14 @@ static void on_ota(IotclEventData data) {
         const char *command = iotcl_clone_command(data);
         if (NULL != command) {
             // URL will be inside the command
-            printf("Command is: %s\n", command);
+            fprintf(stdout, "Command is: %s\n", command);
             message = "Old back end URLS are not supported by the app";
             free((void *) command);
         }
     }
     const char *ack = iotcl_create_ack_string_and_destroy_event(data, success, message);
     if (NULL != ack) {
-        printf("Sent OTA ack: %s\n", ack);
+        fprintf(stdout, "Sent OTA ack: %s\n", ack);
         iotconnect_sdk_send_packet(ack);
         free((void *) ack);
     }
@@ -126,13 +126,16 @@ static void publish_telemetry() {
 
     const char *str = iotcl_create_serialized_string(msg, false);
     iotcl_telemetry_destroy(msg);
-    printf("Sending: %s\n", str);
+    fprintf(stdout, "Sending: %s\n", str);
     iotconnect_sdk_send_packet(str); // underlying code will report an error
     iotcl_destroy_serialized(str);
 }
 
 
 int main(int argc, char *argv[]) {
+    
+    setvbuf(stdout, NULL, _IONBF, 0);
+    
     if (access(IOTCONNECT_SERVER_CERT, F_OK) != 0) {
         fprintf(stderr, "Unable to access IOTCONNECT_SERVER_CERT. "
                "Please change directory so that %s can be accessed from the application or update IOTCONNECT_CERT_PATH\n",
