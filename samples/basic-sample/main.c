@@ -28,11 +28,19 @@ int usleep(unsigned long usec) {
 #endif
 
 #define APP_VERSION "00.01.00"
+#define STRINGS_ARE_EQUAL 0
+
+typedef enum image_variant {
+    IMAGE_A,
+    IMAGE_B,
+    IMAGE_END
+} image_variant_t;
 
 typedef struct local_data {
 
     bool reboot_needed;
     int ret_code;
+    image_variant_t current_image;
 
 } local_data_t;
 
@@ -84,7 +92,24 @@ static int ota_handle(char *url){
     CURL* handle;
     FILE* fd;
 
-    fd = fopen("/home/basic-sample-b", "w");
+    char* path = NULL;
+
+    switch (local_data.current_image){
+        case IMAGE_A:
+            path = "/usr/bin/basic-sample-b";
+            break;
+        case IMAGE_B:
+            path = "/usr/bin/basic-sample";
+            break;
+        default:
+            printf("Invalid image setting\r\n");
+            return 1;
+            break;
+    }
+
+    printf("using %s to write\r\n", path);
+
+    fd = fopen(path, "w");
 
     if (!fd){
         printf("fd NULL\r\n");
@@ -191,6 +216,17 @@ int main(int argc, char *argv[]) {
     
     local_data.reboot_needed = false;
 
+    if (argc == 2){
+        if (strcmp(argv[1], "A") == STRINGS_ARE_EQUAL){
+            local_data.current_image = IMAGE_A;
+        } else if (strcmp(argv[1], "B") == STRINGS_ARE_EQUAL){
+            local_data.current_image = IMAGE_B;
+        } else {
+            printf("Invalid char passed\r\n");
+            return 1;
+        }
+    }
+
     if (access(IOTCONNECT_SERVER_CERT, F_OK) != 0) {
         fprintf(stderr, "Unable to access IOTCONNECT_SERVER_CERT. "
                "Please change directory so that %s can be accessed from the application or update IOTCONNECT_CERT_PATH\n",
@@ -250,7 +286,11 @@ int main(int argc, char *argv[]) {
                 iotconnect_sdk_receive();
                 usleep(10000); // 10ms
             }
-            
+            printf("app version: %s\r\n", APP_VERSION);
+            if (local_data.reboot_needed){
+                printf("Reboot requested\r\n");
+                goto RETURN;
+            }
         }
 
         ret = iotconnect_sdk_init();
@@ -258,14 +298,11 @@ int main(int argc, char *argv[]) {
             fprintf(stderr, "IoTConnect exited with error code %d\n", ret);
             return ret;
         }    
-        printf("app version: %s\r\n", APP_VERSION);
-            if (local_data.reboot_needed){
-                break;
-            }
+        
         usleep(100000); // 1s
     }
+RETURN:
 
-
-
+    printf("returning %d\r\n", local_data.ret_code);
     return local_data.ret_code;
 }
