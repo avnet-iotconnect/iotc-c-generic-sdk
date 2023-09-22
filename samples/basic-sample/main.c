@@ -9,6 +9,8 @@
 #include "iotconnect_common.h"
 #include "iotconnect.h"
 
+#include <curl/curl.h>
+
 #include "app_config.h"
 
 // windows compatibility
@@ -26,6 +28,15 @@ int usleep(unsigned long usec) {
 #endif
 
 #define APP_VERSION "00.01.00"
+
+typedef struct local_data {
+
+    bool reboot_needed;
+    int ret_code;
+
+} local_data_t;
+
+static local_data_t local_data;
 
 static void on_connection_status(IotConnectConnectionStatus status) {
     // Add your own status handling
@@ -68,6 +79,40 @@ static bool app_needs_ota_update(const char *version) {
     return strcmp(APP_VERSION, version) < 0;
 }
 
+static int ota_handle(char *url){
+
+    CURL* handle;
+    FILE* fd;
+
+    fd = fopen("/home/basic-sample-b", "w");
+
+    if (!fd){
+        printf("fd NULL\r\n");
+        return 1;
+    }
+
+    printf("url: %s\r\n", url);
+
+    handle = curl_easy_init();
+
+    printf("past init\r\n");
+
+    curl_easy_setopt(handle, CURLOPT_URL, url);
+    curl_easy_setopt(handle, CURLOPT_WRITEDATA, (void*)fd);
+
+    CURLcode success = 0;
+
+    printf("before perform\r\n");
+
+    success = curl_easy_perform(handle);
+
+    printf("ret code: %d\r\n", success);
+
+    curl_easy_cleanup(handle);
+
+    return success;
+}
+
 static void on_ota(IotclEventData data) {
     const char *message = NULL;
     char *url = iotcl_clone_download_url(data, 0);
@@ -82,7 +127,15 @@ static void on_ota(IotclEventData data) {
         } else if (app_needs_ota_update(version)) {
             fprintf(stdout, "OTA update is required for version %s.\n", version);
             success = false;
-            message = "Not implemented";
+            if (ota_handle(url) == CURLE_OK){
+                printf("Successfully downloaded new binary!\r\n");
+                message = "OK";
+                local_data.reboot_needed = true;
+                local_data.ret_code = 5;
+            } else {
+                message = "Failed";
+            }
+            
         } else {
             fprintf(stdout, "Device firmware version %s is newer than OTA version %s. Sending failure\n", APP_VERSION,
                    version);
@@ -136,6 +189,8 @@ int main(int argc, char *argv[]) {
     
     setvbuf(stdout, NULL, _IONBF, 0);
     
+    local_data.reboot_needed = false;
+
     if (access(IOTCONNECT_SERVER_CERT, F_OK) != 0) {
         fprintf(stderr, "Unable to access IOTCONNECT_SERVER_CERT. "
                "Please change directory so that %s can be accessed from the application or update IOTCONNECT_CERT_PATH\n",
@@ -184,6 +239,8 @@ int main(int argc, char *argv[]) {
         return ret;
     }    
 
+    local_data.ret_code = 0;
+
     // run infinitely if connection is successful
     while (1){
         while (iotconnect_sdk_is_connected()){
@@ -193,6 +250,7 @@ int main(int argc, char *argv[]) {
                 iotconnect_sdk_receive();
                 usleep(10000); // 10ms
             }
+            
         }
 
         ret = iotconnect_sdk_init();
@@ -200,31 +258,14 @@ int main(int argc, char *argv[]) {
             fprintf(stderr, "IoTConnect exited with error code %d\n", ret);
             return ret;
         }    
-
+        printf("app version: %s\r\n", APP_VERSION);
+            if (local_data.reboot_needed){
+                break;
+            }
         usleep(100000); // 1s
     }
 
-    /*
-    for (int j = 0; j < 10; j++) {
-        int ret = iotconnect_sdk_init();
-        if (0 != ret) {
-            fprintf(stderr, "IoTConnect exited with error code %d\n", ret);
-            return ret;
-        }
-
-        // send 10 messages
-        for (int i = 0; iotconnect_sdk_is_connected() && i < 10; i++) {
-            publish_telemetry();
-            // repeat approximately evey ~5 seconds
-            for (int k = 0; k < 500; k++) {
-                iotconnect_sdk_receive();
-                usleep(10000); // 10ms
-            }
-        }
-        iotconnect_sdk_disconnect();
-    }
-    */
 
 
-    return 0;
+    return local_data.ret_code;
 }
