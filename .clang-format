@@ -1,0 +1,17 @@
+---
+# We'll use defaults from the LLVM style, but with 4 columns indentation.
+BasedOnStyle: LLVM
+IndentWidth: 4
+TabWidth: 4
+ColumnLimit: 112
+BreakBeforeBraces: Linux
+SortIncludes: false
+PointerAlignment: Right
+SpaceAfterCStyleCast: true
+IndentCaseLabels: true
+BreakBeforeBraces: Custom
+BraceWrapping:
+    AfterFunction: false
+AllowShortFunctionsOnASingleLine: None
+# UseTab: Always
+...
