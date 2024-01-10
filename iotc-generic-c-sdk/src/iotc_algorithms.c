@@ -4,8 +4,10 @@
 //
 
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 #include <ctype.h>
+#include "iotconnect_common.h"
 #include <openssl/evp.h>
 #include <openssl/hmac.h>
 #include <openssl/buffer.h>
@@ -19,75 +21,24 @@
 #define IOTHUB_SIGNATURE_STR_FORMAT "%s\n%lu"
 #endif
 
+/*
+ * Need to supply these routines, if want to generate SAS tokens
+ */
+static void iotc_hmac_sha256(const void *key, unsigned int keylen, const unsigned char *data, unsigned int datalen, unsigned char *result, unsigned int *resultlen);
+static unsigned char *b64_string_to_buffer(const char *input, unsigned int *len);
+static char *b64_buffer_to_string(const unsigned char *input, unsigned int length);
+
 #ifndef IOTHUB_SAS_TOKEN_FORMAT
 #define IOTHUB_SAS_TOKEN_FORMAT "SharedAccessSignature sr=%s&sig=%s&se=%lu"
 #endif
 
-#if 1
-void hmac_sha256(const void *key, int keylen,
-                                   const unsigned char *data, int datalen,
+static void iotc_hmac_sha256(const void *key, unsigned int keylen,
+                                   const unsigned char *data, unsigned int datalen,
                                    unsigned char *result, unsigned int *resultlen) {
     HMAC(EVP_sha256(), key, keylen, data, datalen, result, resultlen);
 }
-#else
-void sha256_helper(const unsigned char *data1, int datalen1,
-            const unsigned char *data2, int datalen2,
-            unsigned char *result, unsigned int *resultlen) {
-	EVP_MD_CTX *c = EVP_MD_CTX_new();
 
-	EVP_DigestInit_ex(c, EVP_sha256(), NULL);
-	if(data1 != NULL && datalen1 != 0) {
-            EVP_DigestUpdate(c, data1, datalen1);
-	}
-	if(data2 != NULL && datalen2 != 0) {
-            EVP_DigestUpdate(c, data2, datalen2);
-	}
-        EVP_DigestFinal_ex(c, result, resultlen);
-	EVP_MD_CTX_free(c);
-}
-
-/*
- * This implementation of hmac_sha256 is based on the description in Wikipedia
- * https://en.wikipedia.org/wiki/HMAC
- */
-void hmac_sha256(const void *key, int keylen,
-                                   const unsigned char *data, int datalen,
-                                   unsigned char *result, unsigned int *resultlen) {
-    const int hashSize = 32;
-    const int blockSize = 64;
-    int dummySize;
-
-    unsigned char k_dash[blockSize];
-    unsigned char i_key_pad_message_hash[hashSize];
-    unsigned char output_hash[hashSize];
-
-    memset(k_dash, 0, blockSize);
-    if(keylen > blockSize) {
-	sha256_helper(key, keylen, NULL, 0, k_dash, &dummySize);
-	keylen = blockSize;
-    } else {
-        memcpy(k_dash, key, keylen);
-    }
-
-    {
-        unsigned char i_key_pad[blockSize];
-        for(int i = 0;i < blockSize;i++) {
-            i_key_pad[i] = 0x36 ^ k_dash[i];
-        }
-
-        sha256_helper(i_key_pad, blockSize, data, datalen, i_key_pad_message_hash, &dummySize);
-    }
-
-    unsigned char o_key_pad[blockSize];
-    for(int i = 0;i < blockSize;i++) {
-        o_key_pad[i] = 0x5c ^ k_dash[i];
-    }
-
-    sha256_helper(o_key_pad, blockSize, i_key_pad_message_hash, hashSize, result, resultlen);
-}
-#endif
-
-unsigned char *b64_string_to_buffer(const char *input, unsigned int *len) {
+static unsigned char *b64_string_to_buffer(const char *input, unsigned int *len) {
     BIO *b64, *source;
     size_t length = strlen(input);
 
@@ -134,7 +85,7 @@ char *b64_buffer_to_string(const unsigned char *input, unsigned int length) {
 }
 
 // outbuff length should be at least ((uri_len * 3) + 1)
-char *uri_encode(const char *uri) {
+static char *uri_encode(const char *uri) {
     const size_t uri_len = strlen(uri);
     char *outbuff = malloc((uri_len * 3) + 1);
     if(!outbuff) {
@@ -157,7 +108,7 @@ char *uri_encode(const char *uri) {
     return outbuff;
 }
 
-char *gen_sas_token(const char *host, const char *cpid, const char *duid, char *b64key, time_t expiry_secs) {
+char *gen_sas_token(const char *host, const char *cpid, const char *duid, const char *b64key, unsigned long expiry_secs) {
     // example: SharedAccessSignature sr=poc-iotconnect-iothub-eu.azure-devices.net%2Fdevices%2CPID-DUUID&sig=WBBsC0rhu1idLR6aWaKiMbcrBCm9jPI4st2clhVKrW4%3D&se=1656689541
     // SharedAccessSignature sr={URL-encoded-resourceURI}&sig={signature-string}&se={expiry}
     // URL-encoded-resourceURI: myHub.azure-devices.net/devices/mydevice
@@ -168,7 +119,7 @@ char *gen_sas_token(const char *host, const char *cpid, const char *duid, char *
     const size_t len_duid = strlen(duid);
     const size_t len_resource_uri = (sizeof(IOTHUB_RESOURCE_URI_FORMAT) + len_host + len_cpid + len_duid) * 3;
 
-    const time_t expiration = time(NULL) + expiry_secs;
+    unsigned long int expiration = ((unsigned long int) time(NULL)) + expiry_secs;
     char *resource_uri = malloc(len_resource_uri);
     if(!resource_uri) {
         return NULL;
@@ -189,16 +140,16 @@ char *gen_sas_token(const char *host, const char *cpid, const char *duid, char *
     }
     sprintf(string_to_sign, IOTHUB_SIGNATURE_STR_FORMAT,
             encoded_resource_uri,
-            expiration
+            (unsigned long int) expiration
     );
 
 
-    unsigned int bufflen = 0;
-    unsigned char *key = b64_string_to_buffer(b64key, &bufflen);
+    unsigned int keylen = 0;
+    unsigned char *key = b64_string_to_buffer(b64key, &keylen);
 
-    unsigned char digest[EVP_MAX_MD_SIZE];
+    unsigned char digest[32];
     unsigned int digest_len = 0;
-    hmac_sha256(key, (int) bufflen, (const unsigned char*) string_to_sign, (int) strlen(string_to_sign), digest, &digest_len);
+    iotc_hmac_sha256(key, keylen, (const unsigned char*) string_to_sign, strlen(string_to_sign), digest, &digest_len);
     free(key);
     free(string_to_sign);
 
@@ -211,19 +162,15 @@ char *gen_sas_token(const char *host, const char *cpid, const char *duid, char *
                              strlen(encoded_b64_digest) +
                              +10 /* unix time */
     );
-    if(!sas_token) {
-        free(encoded_resource_uri);
-        free(encoded_b64_digest);
-        return NULL;
+    if(sas_token) {
+        sprintf(sas_token, IOTHUB_SAS_TOKEN_FORMAT,
+                encoded_resource_uri,
+                encoded_b64_digest,
+                (unsigned long int) expiration);
     }
-    sprintf(sas_token, IOTHUB_SAS_TOKEN_FORMAT,
-            encoded_resource_uri,
-            encoded_b64_digest,
-            expiration
-    );
     free(encoded_resource_uri);
     free(encoded_b64_digest);
-    printf("Token: %s\n", sas_token);
+
     return sas_token;
 }
 
