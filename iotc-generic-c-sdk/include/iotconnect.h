@@ -43,14 +43,14 @@ typedef void (*IotConnectStatusCallback)(IotConnectConnectionStatus data);
 
 typedef struct {
     IotConnectAuthType type;
-    char* trust_store; // Path to a file containing the trust certificates for the remote MQTT host
+    const char* trust_store; // Path to a file containing the trust certificates for the remote MQTT host
     union {
         struct {
-            char* device_cert; // Path to a file containing the device CA cert (or chain) in PEM format
-            char* device_key; // Path to a file containing the device private key in PEM format
+            const char* device_cert; // Path to a file containing the device CA cert (or chain) in PEM format
+            const char* device_key; // Path to a file containing the device private key in PEM format
         } cert_info;
-        char *symmetric_key;
-        char *scope_id; // for TPM authentication. AKA: ID Scope
+        const char *symmetric_key;
+        const char *scope_id; // for TPM authentication. AKA: ID Scope
     } data;
 } IotConnectAuthInfo;
 
@@ -64,10 +64,12 @@ typedef struct {
     IotclCommandCallback cmd_cb; // callback for command events.
     IotclMessageCallback msg_cb; // callback for ALL messages, including the specific ones like cmd or ota callback.
     IotConnectStatusCallback status_cb; // callback for connection status
+    bool dynamic_memory;
 } IotConnectClientConfig;
 
 
 IotConnectClientConfig *iotconnect_sdk_init_and_get_config(void);
+IotConnectClientConfig *iotconnect_sdk_init_and_alloc_config(char *env, char *cpid, char *duid, int authentication_type, char *symmetric_key);
 
 // call iotconnect_sdk_init_and_get_config first and configure the SDK before calling iotconnect_sdk_init()
 int iotconnect_sdk_init(void);
@@ -83,6 +85,7 @@ void iotconnect_sdk_receive(void);
 int iotconnect_sdk_send_packet(const char *data);
 
 void iotconnect_sdk_disconnect(void);
+void iotconnect_sdk_reset_config(void);
 
 #ifdef __cplusplus
 }

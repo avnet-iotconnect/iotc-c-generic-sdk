@@ -9,6 +9,7 @@
 #ifdef IOTC_USE_PAHO
 #include "iotc_algorithms.h"
 #endif
+#include "iotconnect_common.h"
 #include "iotconnect_discovery.h"
 #include "iotconnect.h"
 #include "iotc_http_request.h"
@@ -227,9 +228,89 @@ bool iotconnect_sdk_is_connected(void) {
     return iotc_device_client_is_connected();
 }
 
-IotConnectClientConfig *iotconnect_sdk_init_and_get_config(void) {
+//
+// Reset the config
+//
+// Deallocate any dynamically allocated data
+// Disconnect MQTT, clear any previous discovery and sync responses -- as may reconfigure to a new device.
+//
+void iotconnect_sdk_reset_config(void) {
+    if(iotconnect_sdk_is_connected() == true) {
+        iotconnect_sdk_disconnect();
+    }
+
+    tpm_registration_id = NULL;
+
+    iotcl_discovery_free_sync_response(sync_response);
+    sync_response = NULL;
+
+    iotcl_discovery_free_discovery_response(discovery_response);
+    discovery_response = NULL;
+
+    if(config.dynamic_memory) {
+        free(config.cpid);
+        free(config.duid);
+        free(config.env);
+        free((void *) config.auth_info.data.symmetric_key);
+    }
     memset(&config, 0, sizeof(config));
+}
+
+//
+// Initialise a config to use static memory - any previous dynamic memory is freed in iotconnect_sdk_reset_config() 
+//
+IotConnectClientConfig *iotconnect_sdk_init_and_get_config(void) {
+    iotconnect_sdk_reset_config();
+    // implicitly config.dynamic_memory == false
     return &config;
+}
+
+//
+// Initialise a config to use dynamic memory - any previous dynamic memory is freed in iotconnect_sdk_reset_config() 
+//
+// Similar to iotconnect_sdk_init_and_get_config() but allocates pointers in the config using dynamic memory using values passed in
+//
+IotConnectClientConfig *iotconnect_sdk_init_and_alloc_config(char *env, char *cpid, char *duid, int authentication_type, char *symmetric_key) {
+    iotconnect_sdk_reset_config();
+
+    config.env = iotcl_strdup(env);
+    if(config.env == NULL)
+    {
+        // IOTC_ERROR(("iotcl_strdup() failed\n"));
+        goto cleanup;
+    }
+
+    config.cpid = iotcl_strdup(cpid);
+    if(config.cpid == NULL)
+    {
+        // IOTC_ERROR(("iotcl_strdup() failed\n"));
+        goto cleanup;
+    }
+
+    config.duid = iotcl_strdup(duid);
+    if(config.duid == NULL)
+    {
+        // IOTC_ERROR(("iotcl_strdup() failed\n"));
+        goto cleanup;
+    }
+
+    config.auth_info.type = authentication_type;
+    if(config.auth_info.type == IOTC_AT_SYMMETRIC_KEY)
+    {
+        config.auth_info.data.symmetric_key = (const char *) iotcl_strdup(symmetric_key);
+        if(config.auth_info.data.symmetric_key == NULL)
+        {
+            // IOTC_ERROR(("iotcl_strdup() failed\n"));
+            goto cleanup;
+        }
+    }
+
+    config.dynamic_memory = true;
+    return &config;
+
+cleanup:
+    iotconnect_sdk_reset_config();
+    return NULL;
 }
 
 static void on_message_intercept(IotclEventData data, IotConnectEventType type) {
@@ -237,6 +318,7 @@ static void on_message_intercept(IotclEventData data, IotConnectEventType type) 
         case ON_FORCE_SYNC:
             iotconnect_sdk_disconnect();
             iotcl_discovery_free_discovery_response(discovery_response);
+            discovery_response = NULL;
             iotcl_discovery_free_sync_response(sync_response);
             sync_response = NULL;
             discovery_response = run_http_discovery(config.cpid, config.env);
@@ -278,7 +360,7 @@ void iotconnect_sdk_receive(void) {
 ///////////////////////////////////////////////////////////////////////////////////
 // this the Initialization os IoTConnect SDK
 int iotconnect_sdk_init(void) {
-    int ret;
+    int ret = 0;
 
     if (config.auth_info.type == IOTC_AT_TPM) {
         if (!config.duid || strlen(config.duid) == 0) {
