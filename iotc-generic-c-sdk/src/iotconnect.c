@@ -25,59 +25,57 @@ static IotclDiscoveryResponse *discovery_response = NULL;
 static IotclSyncResponse *sync_response = NULL;
 
 // cached TPM registration ID if TPM auth is used
-// once (if) we support a dispose method, we should free this value
+// once (if) we support a discpose method, we should free this value
 static char *tpm_registration_id = NULL;
 
 static void dump_response(const char *message, IotConnectHttpResponse *response) {
-    if(message) {
-        IOTC_ERROR(("%s\n", message));
-    }
-
+    fprintf(stderr, "%s", message);
     if (response->data) {
-        IOTC_DEBUG((" Response was:\n----\n%s\n----\n", response->data));
+        fprintf(stderr, " Response was:\n----\n%s\n----\n", response->data);
     } else {
-        IOTC_WARN((" Response was empty\n"));
+        fprintf(stderr, " Response was empty\n");
     }
 }
 
 static void report_sync_error(const IotclSyncResponse *response, const char *sync_response_str) {
     if (NULL == response) {
-        IOTC_ERROR(("Failed to obtain sync response?\n"));
+        fprintf(stderr, "Failed to obtain sync response?\n");
         return;
     }
     switch (response->ds) {
         case IOTCL_SR_DEVICE_NOT_REGISTERED:
-            IOTC_ERROR(("IOTC_SyncResponse error: Not registered\n"));
+            fprintf(stderr, "IOTC_SyncResponse error: Not registered\n");
             break;
         case IOTCL_SR_AUTO_REGISTER:
-            IOTC_ERROR(("IOTC_SyncResponse error: Auto Register\n"));
+            fprintf(stderr, "IOTC_SyncResponse error: Auto Register\n");
             break;
         case IOTCL_SR_DEVICE_NOT_FOUND:
-            IOTC_ERROR(("IOTC_SyncResponse error: Device not found\n"));
+            fprintf(stderr, "IOTC_SyncResponse error: Device not found\n");
             break;
         case IOTCL_SR_DEVICE_INACTIVE:
-            IOTC_ERROR(("IOTC_SyncResponse error: Device inactive\n"));
+            fprintf(stderr, "IOTC_SyncResponse error: Device inactive\n");
             break;
         case IOTCL_SR_DEVICE_MOVED:
-            IOTC_ERROR(("IOTC_SyncResponse error: Device moved\n"));
+            fprintf(stderr, "IOTC_SyncResponse error: Device moved\n");
             break;
         case IOTCL_SR_CPID_NOT_FOUND:
-            IOTC_ERROR(("IOTC_SyncResponse error: CPID not found\n"));
+            fprintf(stderr, "IOTC_SyncResponse error: CPID not found\n");
             break;
         case IOTCL_SR_UNKNOWN_DEVICE_STATUS:
-            IOTC_ERROR(("IOTC_SyncResponse error: Unknown device status error from server\n"));
+            fprintf(stderr, "IOTC_SyncResponse error: Unknown device status error from server\n");
             break;
         case IOTCL_SR_ALLOCATION_ERROR:
-            IOTC_ERROR(("IOTC_SyncResponse internal error: Allocation Error\n"));
+            fprintf(stderr, "IOTC_SyncResponse internal error: Allocation Error\n");
             break;
         case IOTCL_SR_PARSING_ERROR:
-            IOTC_ERROR(("IOTC_SyncResponse internal error: Parsing error. Please check parameters passed to the request.\n"));
+            fprintf(stderr,
+                    "IOTC_SyncResponse internal error: Parsing error. Please check parameters passed to the request.\n");
             break;
         default:
-            IOTC_ERROR(("WARN: report_sync_error called, but no error returned?\n"));
+            fprintf(stderr, "WARN: report_sync_error called, but no error returned?\n");
             break;
     }
-    IOTC_ERROR(("Raw server response was:\n--------------\n%s\n--------------\n", sync_response_str));
+    fprintf(stderr, "Raw server response was:\n--------------\n%s\n--------------\n", sync_response_str);
 }
 
 static IotclDiscoveryResponse *run_http_discovery(const char *cpid, const char *env) {
@@ -89,7 +87,7 @@ static IotclDiscoveryResponse *run_http_discovery(const char *cpid, const char *
     );
 
     if(!url_buff) {
-        IOTC_ERROR(("Unable to allocate memory"));
+        fprintf(stderr, "Unable to allocate memory");
         return NULL;
     }
 
@@ -118,7 +116,7 @@ static IotclDiscoveryResponse *run_http_discovery(const char *cpid, const char *
 
     ret = iotcl_discovery_parse_discovery_response(json_start);
     if (!ret) {
-        IOTC_ERROR(("Error: Unable to get discovery response for environment \"%s\". Please check the environment name in the key vault.\n", env));
+        fprintf(stderr, "Error: Unable to get discovery response for environment \"%s\". Please check the environment name in the key vault.\n", env);
     }
 
     cleanup:
@@ -137,7 +135,7 @@ static IotclSyncResponse *run_http_sync(const char *cpid, const char *uniqueid) 
     char *post_data = malloc(IOTCONNECT_DISCOVERY_PROTOCOL_POST_DATA_MAX_LEN + 1);
 
     if (!url_buff || !post_data) {
-        IOTC_ERROR(("run_http_sync: Out of memory!"));
+        fprintf(stderr, "run_http_sync: Out of memory!");
         free(url_buff); // one of them could have succeeded
         free(post_data);
         return NULL;
@@ -187,7 +185,7 @@ static IotclSyncResponse *run_http_sync(const char *cpid, const char *uniqueid) 
             }
 
             sprintf(ret->broker.client_id, "%s-%s", cpid, uniqueid);
-            IOTC_WARN(("TPM Device is not yet enrolled. Enrolling...\n"));
+            printf("TPM Device is not yet enrolled. Enrolling...\n");
         } else {
             report_sync_error(ret, response.data);
             iotcl_discovery_free_sync_response(ret);
@@ -205,23 +203,23 @@ static IotclSyncResponse *run_http_sync(const char *cpid, const char *uniqueid) 
 static void on_mqtt_c2d_message(const unsigned char *message, size_t message_len) {
     char *str = malloc(message_len + 1);
     if(!str) {
-        IOTC_ERROR(("Unable to allocate memory\n"));
+        fprintf(stderr, "Unable to allocate memory\n");
         return;
     }
 
     memcpy(str, message, message_len);
     str[message_len] = 0;
-    IOTC_DEBUG(("event>>> %s\n", str));
+    printf("event>>> %s\n", str);
     if (!iotcl_process_event(str)) {
-        IOTC_ERROR(("Error encountered while processing %s\n", str));
+        fprintf(stderr, "Error encountered while processing %s\n", str);
     }
     free(str);
 }
 
 void iotconnect_sdk_disconnect(void) {
-    IOTC_DEBUG(("Disconnecting...\n"));
+    printf("Disconnecting...\n");
     if (0 == iotc_device_client_disconnect()) {
-        IOTC_DEBUG(("Disconnected.\n"));
+        printf("Disconnected.\n");
     }
 }
 
@@ -243,25 +241,25 @@ static void on_message_intercept(IotclEventData data, IotConnectEventType type) 
             sync_response = NULL;
             discovery_response = run_http_discovery(config.cpid, config.env);
             if (NULL == discovery_response) {
-                IOTC_ERROR(("Unable to run HTTP discovery on ON_FORCE_SYNC\n"));
+                fprintf(stderr, "Unable to run HTTP discovery on ON_FORCE_SYNC\n");
                 return;
             }
             sync_response = run_http_sync(config.cpid, config.duid);
             if (NULL == sync_response) {
-                IOTC_ERROR(("Unable to run HTTP sync on ON_FORCE_SYNC\n"));
+                fprintf(stderr, "Unable to run HTTP sync on ON_FORCE_SYNC\n");
                 return;
             }
-            IOTC_DEBUG(("Got ON_FORCE_SYNC. Disconnecting.\n"));
+            printf("Got ON_FORCE_SYNC. Disconnecting.\n");
             iotconnect_sdk_disconnect(); // client will get notification that we disconnected and will reinit
             break;
 
         case ON_CLOSE:
-            IOTC_DEBUG(("Got ON_CLOSE. Closing the mqtt connection. Device restart is required.\n"));
+            printf("Got ON_CLOSE. Closing the mqtt connection. Device restart is required.\n");
             iotconnect_sdk_disconnect();
             break;
 
         default:
-            break; // not handling any other messages
+            break; // not handling nay other messages
     }
 
     if (NULL != config.msg_cb) {
@@ -297,7 +295,7 @@ int iotconnect_sdk_init(void) {
             // get_base_url will print the error
             return -1;
         }
-        IOTC_DEBUG(("Discovery response parsing successful.\n"));
+        printf("Discovery response parsing successful.\n");
     }
 
     if (!sync_response) {
@@ -306,7 +304,7 @@ int iotconnect_sdk_init(void) {
             // Sync_call will print the error
             return -2;
         }
-        IOTC_DEBUG(("Sync response parsing successful.\n"));
+        printf("Sync response parsing successful.\n");
     }
 
     // We want to print only first 4 characters of cpid
@@ -315,7 +313,7 @@ int iotconnect_sdk_init(void) {
     lib_config.device.duid = config.duid;
 
     if (!config.env || !config.cpid || !config.duid) {
-        IOTC_ERROR(("Error: Device configuration is invalid. Configuration values for env, cpid and duid are required.\n"));
+        printf("Error: Device configuration is invalid. Configuration values for env, cpid and duid are required.\n");
         return -1;
     }
 
@@ -328,8 +326,8 @@ int iotconnect_sdk_init(void) {
     char cpid_buff[5];
     strncpy(cpid_buff, config.cpid, 4);
     cpid_buff[4] = 0;
-    IOTC_DEBUG(("CPID: %s***\n", cpid_buff));
-    IOTC_DEBUG(("ENV:  %s\n", config.env));
+    printf("CPID: %s***\n", cpid_buff);
+    printf("ENV:  %s\n", config.env);
 
 
     if (config.auth_info.type != IOTC_AT_TOKEN &&
@@ -337,18 +335,18 @@ int iotconnect_sdk_init(void) {
         config.auth_info.type != IOTC_AT_TPM &&
         config.auth_info.type != IOTC_AT_SYMMETRIC_KEY
         ) {
-        IOTC_ERROR(("Error: Unsupported authentication type!\n"));
+        fprintf(stderr, "Error: Unsupported authentication type!\n");
         return -1;
     }
 
     if (!config.auth_info.trust_store) {
-        IOTC_ERROR(("Error: Configuration server certificate is required.\n"));
+        fprintf(stderr, "Error: Configuration server certificate is required.\n");
         return -1;
     }
     if (config.auth_info.type == IOTC_AT_X509 && (
             !config.auth_info.data.cert_info.device_cert ||
             !config.auth_info.data.cert_info.device_key)) {
-        IOTC_ERROR(("Error: Configuration authentication info is invalid.\n"));
+        fprintf(stderr, "Error: Configuration authentication info is invalid.\n");
         return -1;
     }
 
@@ -364,23 +362,23 @@ int iotconnect_sdk_init(void) {
             );
             free (sync_response->broker.pass);
             // a bit of a hack - the token will be freed when freeing the sync response
-            // paho will use the SAS token as the broker pasword
+            // paho will use the borken pasword
             sync_response->broker.pass = sas_token;
 #endif
         } else {
-            IOTC_ERROR(("Error: Configuration symmetric key is missing.\n"));
+            fprintf(stderr, "Error: Configuration symmetric key is missing.\n");
             return -1;
         }
     }
 
     if (config.auth_info.type == IOTC_AT_TOKEN) {
         if (!(sync_response->broker.pass || strlen(config.auth_info.data.symmetric_key) == 0)) {
-            IOTC_ERROR(("Error: Unable to obtainm .\n"));
+            fprintf(stderr, "Error: Unable to obtainm .\n");
             return -1;
         }
     }
     if (!iotcl_init(&lib_config)) {
-        IOTC_ERROR(("Error: Failed to initialize the IoTConnect Lib\n"));
+        fprintf(stderr, "Error: Failed to initialize the IoTConnect Lib\n");
         return -1;
     }
 
@@ -393,7 +391,7 @@ int iotconnect_sdk_init(void) {
 
     ret = iotc_device_client_init(&pc);
     if (ret) {
-        IOTC_ERROR(("Failed to connect!\n"));
+        fprintf(stderr, "Failed to connect!\n");
         return ret;
     }
 
@@ -407,7 +405,7 @@ int iotconnect_sdk_init(void) {
             return -2;
         }
         lib_config.telemetry.dtg = sync_response->dtg;
-        IOTC_DEBUG(("Secondary Sync response parsing successful. DTG is: %s.\n", sync_response->dtg));
+        printf("Secondary Sync response parsing successful. DTG is: %s.\n", sync_response->dtg);
     }
 
     return ret;
