@@ -9,6 +9,8 @@
 #include <ctype.h>
 #include "iotconnect_common.h"
 
+#if EMBEDDED_DEVICE
+
 #ifndef IOTHUB_RESOURCE_URI_FORMAT
 #define IOTHUB_RESOURCE_URI_FORMAT "%s/devices/%s-%s"
 #endif
@@ -424,4 +426,6 @@ char *gen_sas_token(const char *host, const char *cpid, const char *duid, const 
 
     return sas_token;
 }
+
+#endif // EMBEDDED_DEVICE
 
