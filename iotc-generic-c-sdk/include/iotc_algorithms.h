@@ -12,10 +12,7 @@
 extern   "C" {
 #endif
 
-char *gen_sas_token(const char *host, const char *cpid, const char *duid, char *b64key, time_t expiry_secs);
-char *uri_encode(const char *uri);
-unsigned char *b64_string_to_buffer(const char *input, unsigned int *len);
-char *b64_buffer_to_string(const unsigned char *input, unsigned int length);
+char *gen_sas_token(const char *host, const char *cpid, const char *duid, const char *b64key, time_t expiry_secs);
 
 #ifdef __cplusplus
 }
