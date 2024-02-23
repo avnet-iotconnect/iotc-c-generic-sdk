@@ -16,6 +16,40 @@
 extern "C" {
 #endif
 
+#include <stdio.h>
+
+/*
+ * To use iotconnect need to specify debug routines IOTC_DEBUG, IOTC_WARN and IOTC_ERROR
+ *
+ * Two example implementations are shown below.
+ * Another possible implementation would be to use syslog().
+ */
+// #define USE_SYSLOG 1
+#if USE_SYSLOG
+#include <syslog.h>
+#define IOTC_ERROR(...) syslog(LOG_ERR, __VA_ARGS__)
+#define IOTC_WARN(...) syslog(LOG_WARNING, __VA_ARGS__)
+#define IOTC_DEBUG(...) syslog(LOG_DEBUG, __VA_ARGS__)
+#else
+#define IOTC_ENDLN "\n"
+
+#define IOTC_DEBUG_LEVEL 2
+
+#define IOTC_ERROR(...) fprintf(stderr, __VA_ARGS__);fprintf(stderr, IOTC_ENDLN)
+#define IOTC_WARN(...)
+#define IOTC_DEBUG(...)
+
+#if IOTC_DEBUG_LEVEL > 0
+#undef IOTC_WARN
+#define IOTC_WARN(...) fprintf(stderr, __VA_ARGS__);fprintf(stderr, IOTC_ENDLN)
+#if IOTC_DEBUG_LEVEL > 1
+#undef IOTC_DEBUG
+#define IOTC_DEBUG(...) printf(__VA_ARGS__);printf(IOTC_ENDLN)
+#endif
+#endif
+
+#endif // USE_SYSLOG
+
 typedef enum {
     // Authentication based on your CPID. Sync HTTP endpoint returns a long lived SAS token
     // This auth type is only intended as a simple way to connect your test and development devices
