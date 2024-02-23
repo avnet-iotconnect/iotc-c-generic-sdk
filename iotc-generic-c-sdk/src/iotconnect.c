@@ -17,7 +17,6 @@
 #define HTTP_DISCOVERY_URL_FORMAT "https://%s/api/sdk/cpid/%s/lang/M_C/ver/2.0/env/%s"
 #define HTTP_SYNC_URL_FORMAT "https://%s%ssync?"
 
-static IotclConfig lib_config = {0};
 static IotConnectClientConfig config = {0};
 
 // cached discovery/sync response:
@@ -309,22 +308,12 @@ int iotconnect_sdk_init(void) {
         IOTC_DEBUG("Sync response parsing successful.");
     }
 
-    // We want to print only first 4 characters of cpid
-    lib_config.device.env = config.env;
-    lib_config.device.cpid = config.cpid;
-    lib_config.device.duid = config.duid;
-
     if (!config.env || !config.cpid || !config.duid) {
         IOTC_ERROR("Error: Device configuration is invalid. Configuration values for env, cpid and duid are required.");
         return -1;
     }
 
-    lib_config.event_functions.ota_cb = config.ota_cb;
-    lib_config.event_functions.cmd_cb = config.cmd_cb;
-    lib_config.event_functions.msg_cb = on_message_intercept;
-
-    lib_config.telemetry.dtg = sync_response->dtg;
-
+    // We want to print only first 4 characters of cpid
     char cpid_buff[5];
     strncpy(cpid_buff, config.cpid, 4);
     cpid_buff[4] = 0;
@@ -379,6 +368,20 @@ int iotconnect_sdk_init(void) {
             return -1;
         }
     }
+
+    // initialize the IoTConnect Lib - needed for telemetry messages
+    IotclConfig lib_config = {0};
+
+    lib_config.device.env = config.env;
+    lib_config.device.cpid = config.cpid;
+    lib_config.device.duid = config.duid;
+
+    lib_config.event_functions.ota_cb = config.ota_cb;
+    lib_config.event_functions.cmd_cb = config.cmd_cb;
+    lib_config.event_functions.msg_cb = on_message_intercept;
+
+    lib_config.telemetry.dtg = sync_response->dtg;
+
     if (!iotcl_init(&lib_config)) {
         IOTC_ERROR("Error: Failed to initialize the IoTConnect Lib");
         return -1;
@@ -406,7 +409,7 @@ int iotconnect_sdk_init(void) {
             // Sync_call will print the error
             return -2;
         }
-        lib_config.telemetry.dtg = sync_response->dtg;
+
         IOTC_DEBUG("Secondary Sync response parsing successful. DTG is: %s", sync_response->dtg);
     }
 
