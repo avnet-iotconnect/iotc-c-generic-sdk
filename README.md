@@ -8,12 +8,6 @@ The Paho MQTT implementation does not support TPM authentication.
 
 To get started quickly, see the [IoTConnect Generic C SDK Windows](https://www.youtube.com/watch?v=cvP3zmcs8JA) and [SmartEdge Industrial IoT Gateway](https://www.youtube.com/watch?v=j6AC95nz7IY) demo videos on YouTube.
  
-#### CMake Build Options
-
-Note that the following build options are configured by default and can be toggled with cmake flags:
-* IOTC_USE_PAHO=ON - Builds with Paho MQTT Client instead of Azure IoT C SDK by default.
-* IOTC_TPM_SUPPORT=ON -  Adds TPM Support for Azure IoT C SDK. Requires IOTC_USE_PAHO=OFF.
-
 #### Dependencies
 
 The project depends on curl openssl libraries and uuid library (uuid required for for Azure C SDK flavor onl) .

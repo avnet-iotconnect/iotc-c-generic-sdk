@@ -1,12 +1,6 @@
 [submodule "lib/paho.mqtt.c"]
 	path = lib/paho.mqtt.c
 	url = https://github.com/eclipse/paho.mqtt.c.git
-[submodule "lib/cJSON"]
-	path = lib/cJSON
-	url = https://github.com/DaveGamble/cJSON.git
 [submodule "lib/iotc-c-lib"]
 	path = lib/iotc-c-lib
 	url = https://github.com/avnet-iotconnect/iotc-c-lib.git
-[submodule "lib/azure-iot-sdk-c"]
-	path = lib/azure-iot-sdk-c
-	url = https://github.com/Azure/azure-iot-sdk-c.git

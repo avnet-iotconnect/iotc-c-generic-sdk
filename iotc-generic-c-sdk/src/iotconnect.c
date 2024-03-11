@@ -6,9 +6,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#ifdef IOTC_USE_PAHO
 #include "iotc_algorithms.h"
-#endif
 #include "iotconnect_discovery.h"
 #include "iotconnect.h"
 #include "iotc_http_request.h"
@@ -343,7 +341,6 @@ int iotconnect_sdk_init(void) {
 
     if (config.auth_info.type == IOTC_AT_SYMMETRIC_KEY) {
         if (config.auth_info.data.symmetric_key && strlen(config.auth_info.data.symmetric_key) > 0) {
-#ifdef IOTC_USE_PAHO
             // for paho we need to pass the generated sas token
             char *sas_token = gen_sas_token(sync_response->broker.host,
                                                   config.cpid,
@@ -355,7 +352,6 @@ int iotconnect_sdk_init(void) {
             // a bit of a hack - the token will be freed when freeing the sync response
             // paho will use the SAS token as the broker pasword
             sync_response->broker.pass = sas_token;
-#endif
         } else {
             IOTC_ERROR("Error: Configuration symmetric key is missing.");
             return -1;
