@@ -16,6 +16,10 @@
 */
 #define IOTCL_C2D_LEGACY_ACK_SUPPORT
 
+//Temporary workaround for discovery response is erroneously reporting that your subscription has expired.
+#define IOTCL_DRA_DISCOVERY_IGNORE_SUBSCRIPTION_EXPIRED
+
+
 // See iotc_log.h for more information about configuring logging
 
 #define IOTCL_ENDLN "\n"

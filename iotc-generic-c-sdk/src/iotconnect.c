@@ -61,8 +61,7 @@ static int run_http_identity(IotConnectConnectionType ct, const char *cpid, cons
     }
 
     if (status) {
-        // the called function will check arguments and return error
-        return status;
+        return status; // called function will print the error
     }
 
     IotConnectHttpResponse response;
@@ -71,20 +70,20 @@ static int run_http_identity(IotConnectConnectionType ct, const char *cpid, cons
                              NULL
     );
     status = validate_response(&response);
-    if (status) {
-        goto cleanup; // called function will print the error
-    }
+    if (status) goto cleanup; // called function will print the error
+
 
     status = iotcl_dra_discovery_parse(&identity_url, 0, response.data);
     if (status) {
-        goto cleanup; // called function will print the error
+        IOTC_ERROR("Error while parsing discovery response from %s", iotcl_dra_url_get_url(&discovery_url));
+        dump_response(NULL, &response);
+        goto cleanup;
     }
+
     iotconnect_free_https_response(&response);
 
     status = iotcl_dra_identity_build_url(&identity_url, duid);
-    if (status) {
-        goto cleanup; // called function will print the error
-    }
+    if (status) goto cleanup; // called function will print the error
 
     iotconnect_https_request(&response,
                              iotcl_dra_url_get_url(&identity_url),
@@ -92,13 +91,13 @@ static int run_http_identity(IotConnectConnectionType ct, const char *cpid, cons
     );
 
     status = validate_response(&response);
-    if (status) {
-        goto cleanup; // called function will print the error
-    }
+    if (status) goto cleanup; // called function will print the error
 
     status = iotcl_dra_identity_configure_library_mqtt(response.data);
     if (status) {
-        goto cleanup; // called function will print the error
+        IOTC_ERROR("Error while parsing identity response from %s", iotcl_dra_url_get_url(&identity_url));
+        dump_response(NULL, &response);
+        goto cleanup;
     }
 
     if (ct == IOTC_CT_AWS && iotcl_mqtt_get_config()->username) {
