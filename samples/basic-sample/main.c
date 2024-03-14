@@ -107,13 +107,18 @@ static void publish_telemetry() {
     iotcl_telemetry_set_string(msg, "version", APP_VERSION);
 
     // INTEGER template field type
-    iotcl_telemetry_set_number(msg, "random_int", (double) rand());
+    int random_int =  (int) ((double) rand() / RAND_MAX * 10.0); // ger an integer from 0 to 9 first
+    iotcl_telemetry_set_number(msg, "random_int", (double) random_int);
 
     // DECIMAL template field type
-    iotcl_telemetry_set_number(msg, "random_decimal", (double) (rand() / RAND_MAX));
+    iotcl_telemetry_set_number(msg, "random_decimal", (double) rand() / RAND_MAX);
 
     // BOOLEAN template field type
-    iotcl_telemetry_set_number(msg, "random_boolean", (rand() / RAND_MAX) > 0.5 ? true: false);
+    iotcl_telemetry_set_bool(msg, "random_boolean", ((double) rand() / RAND_MAX) > 0.5 ? true: false);
+
+    // OBJECT template field type with two nested DECIMAL values
+    iotcl_telemetry_set_number(msg, "coordinate.x", (double) rand() / RAND_MAX * 10.0);
+    iotcl_telemetry_set_number(msg, "coordinate.y", (double) rand() / RAND_MAX * 10.0);
 
     iotcl_mqtt_send_telemetry(msg, false);
     iotcl_telemetry_destroy(msg);
