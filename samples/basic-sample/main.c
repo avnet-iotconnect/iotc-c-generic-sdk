@@ -32,13 +32,13 @@ static void on_connection_status(IotConnectConnectionStatus status) {
     // Add your own status handling
     switch (status) {
         case IOTC_CS_MQTT_CONNECTED:
-            IOTC_DEBUG("IoTConnect Client Connected");
+            printf("IoTConnect Client Connected\n");
             break;
         case IOTC_CS_MQTT_DISCONNECTED:
-            IOTC_DEBUG("IoTConnect Client Disconnected");
+            printf("IoTConnect Client Disconnected\n");
             break;
         default:
-            IOTC_DEBUG("IoTConnect Client ERROR");
+            printf("IoTConnect Client ERROR\n");
             break;
     }
 }
@@ -76,18 +76,18 @@ static void on_ota(IotclC2dEventData data) {
     const char *ack_id = iotcl_c2d_get_ack_id(data);
     bool success = false;
     if (NULL != url) {
-        IOTC_DEBUG("Download URL is: %s", url);
+        printf("Download URL is: %s\n", url);
         const char *version = iotcl_c2d_get_ota_sw_version(data);
         if (is_app_version_same_as_ota(version)) {
-            IOTC_DEBUG("OTA request for same version %s. Sending success", version);
+            printf("OTA request for same version %s. Sending success\n", version);
             success = true;
             message = "Version is matching";
         } else if (app_needs_ota_update(version)) {
-            IOTC_DEBUG("OTA update is required for version %s.", version);
+            printf("OTA update is required for version %s.\n", version);
             success = false;
             message = "Not implemented";
         } else {
-            IOTC_DEBUG("Device firmware version %s is newer than OTA version %s. Sending failure", APP_VERSION,
+            printf("Device firmware version %s is newer than OTA version %s. Sending failure\n", APP_VERSION,
                    version);
             // Not sure what to do here. The app version is better than OTA version.
             // Probably a development version, so return failure?
@@ -175,7 +175,7 @@ int main(int argc, char *argv[]) {
         config->auth_info.data.symmetric_key = IOTCONNECT_SYMMETRIC_KEY;
     } else {
         // none of the above
-        IOTC_ERROR("Unknown IotConnectAuthType");
+        printf("Unknown IotConnectAuthType\n");
         return -1;
     }
 
@@ -191,7 +191,7 @@ int main(int argc, char *argv[]) {
     for (int j = 0; j < 10; j++) {
         int ret = iotconnect_sdk_init();
         if (0 != ret) {
-            IOTC_ERROR("iotconnect_sdk_init() exited with error code %d", ret);
+            printf("iotconnect_sdk_init() exited with error code %d\n", ret);
             return ret;
         }
 
@@ -204,6 +204,6 @@ int main(int argc, char *argv[]) {
         iotconnect_sdk_disconnect();
     }
 
-    IOTC_DEBUG("Basic sample demo is complete. Exiting.");
+    printf("Basic sample demo is complete. Exiting.\n");
     return 0;
 }
