@@ -1,16 +1,15 @@
-//
-// Copyright: Avnet, Softweb Inc. 2020
-// Modified by Nik Markovic <nikola.markovic@avnet.com> on 6/24/21.
-//
+/* SPDX-License-Identifier: MIT
+ * Copyright (C) 2020-2024 Avnet
+ * Authors: Nikola Markovic <nikola.markovic@avnet.com> et al.
+ */
+
 
 #ifndef IOTCONNECT_H
 #define IOTCONNECT_H
 
 #include <stddef.h>
 #include <time.h>
-#include "iotconnect_event.h"
-#include "iotconnect_telemetry.h"
-#include "iotconnect_lib.h"
+#include "iotcl.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -51,25 +50,19 @@ extern "C" {
 #endif // USE_SYSLOG
 
 typedef enum {
-    // Authentication based on your CPID. Sync HTTP endpoint returns a long lived SAS token
-    // This auth type is only intended as a simple way to connect your test and development devices
-    // and must not be used in production
-    IOTC_AT_TOKEN = 1,
+    IOTC_CT_AWS = 1,
+    IOTC_CT_AZURE
+} IotConnectConnectionType;
 
+typedef enum {
     // CA Cert and Self Signed Cert
-    IOTC_AT_X509 = 2,
-
-    // TPM hardware devices
-    IOTC_AT_TPM = 4, // 4 for compatibility with sync
-
+    IOTC_AT_X509 = 1,
     // IoTHub Key based authentication with Symmetric Keys (Primary or Secondary key)
-    IOTC_AT_SYMMETRIC_KEY = 5
-
+    IOTC_AT_SYMMETRIC_KEY
 } IotConnectAuthType;
 
 typedef enum {
-    IOTC_CS_UNDEFINED,
-    IOTC_CS_MQTT_CONNECTED,
+    IOTC_CS_MQTT_CONNECTED = 1,
     IOTC_CS_MQTT_DISCONNECTED
 } IotConnectConnectionStatus;
 
@@ -89,15 +82,16 @@ typedef struct {
 } IotConnectAuthInfo;
 
 typedef struct {
+    IotConnectConnectionType connection_type;
     char *env;    // Settings -> Key Vault -> CPID.
-    char *cpid;   // Settings -> Key Vault -> Evnironment.
+    char *cpid;   // Settings -> Key Vault -> Environment.
     char *duid;   // Name of the device.
     int qos; // QOS for outbound messages. Default 1.
     IotConnectAuthInfo auth_info;
     IotclOtaCallback ota_cb; // callback for OTA events.
     IotclCommandCallback cmd_cb; // callback for command events.
-    IotclMessageCallback msg_cb; // callback for ALL messages, including the specific ones like cmd or ota callback.
     IotConnectStatusCallback status_cb; // callback for connection status
+    bool trace_data; // If true, we will output sent and received json data to standard out
 } IotConnectClientConfig;
 
 
@@ -107,14 +101,6 @@ IotConnectClientConfig *iotconnect_sdk_init_and_get_config(void);
 int iotconnect_sdk_init(void);
 
 bool iotconnect_sdk_is_connected(void);
-
-// Will check if there are inbound messages and call adequate callbacks if there are any
-// This is technically not required for the Paho implementation.
-void iotconnect_sdk_receive(void);
-
-// blocks until sent and returns 0 if successful.
-// data is a null-terminated string
-int iotconnect_sdk_send_packet(const char *data);
 
 void iotconnect_sdk_disconnect(void);
 

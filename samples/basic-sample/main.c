@@ -1,12 +1,13 @@
-//
-// Copyright: Avnet 2020
-// Created by Nik Markovic <nikola.markovic@avnet.com> on 6/24/21.
-//
+/* SPDX-License-Identifier: MIT
+ * Copyright (C) 2020-2024 Avnet
+ * Authors: Nikola Markovic <nikola.markovic@avnet.com> et al.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include "iotconnect_common.h"
+#include "iotcl.h"
 #include "iotconnect.h"
 
 #include "app_config.h"
@@ -42,21 +43,21 @@ static void on_connection_status(IotConnectConnectionStatus status) {
     }
 }
 
-static void command_status(IotclEventData data, bool status, const char *command_name, const char *message) {
-    const char *ack = iotcl_create_ack_string_and_destroy_event(data, status, message);
-    IOTC_DEBUG("command: %s status=%s: %s", command_name, status ? "OK" : "Failed", message);
-    IOTC_DEBUG("Sent CMD ack: %s", ack);
-    iotconnect_sdk_send_packet(ack);
-    free((void *) ack);
-}
-
-static void on_command(IotclEventData data) {
-    char *command = iotcl_clone_command(data);
-    if (NULL != command) {
-        command_status(data, false, command, "Not implemented");
-        free((void *) command);
+static void on_command(IotclC2dEventData data) {
+    const char *command = iotcl_c2d_get_command(data);
+    const char *ack_id = iotcl_c2d_get_ack_id(data);
+    if (command) {
+        printf("Command %s received with %s ACK ID\n", command, ack_id ? ack_id : "no");
+        // could be a command without acknowledgement, so ackID can be null
+        if (ack_id) {
+            iotcl_mqtt_send_cmd_ack(ack_id, IOTCL_C2D_EVT_CMD_FAILED, "Not implemented");
+        }
     } else {
-        command_status(data, false, "?", "Internal error");
+        // could be a command without acknowledgement, so ackID can be null
+        printf("Failed to parse command\n");
+        if (ack_id) {
+            iotcl_mqtt_send_cmd_ack(ack_id, IOTCL_C2D_EVT_CMD_FAILED, "Internal error");
+        }
     }
 }
 
@@ -68,13 +69,15 @@ static bool app_needs_ota_update(const char *version) {
     return strcmp(APP_VERSION, version) < 0;
 }
 
-static void on_ota(IotclEventData data) {
+// This sample OTA handling only checks the version and verifies if the firmware needs an update but does not download.
+static void on_ota(IotclC2dEventData data) {
     const char *message = NULL;
-    char *url = iotcl_clone_download_url(data, 0);
+    const char *url = iotcl_c2d_get_ota_url(data, 0);
+    const char *ack_id = iotcl_c2d_get_ack_id(data);
     bool success = false;
     if (NULL != url) {
         IOTC_DEBUG("Download URL is: %s", url);
-        const char *version = iotcl_clone_sw_version(data);
+        const char *version = iotcl_c2d_get_ota_sw_version(data);
         if (is_app_version_same_as_ota(version)) {
             IOTC_DEBUG("OTA request for same version %s. Sending success", version);
             success = true;
@@ -92,60 +95,67 @@ static void on_ota(IotclEventData data) {
             success = false;
             message = "Device firmware version is newer";
         }
+    }
 
-        free((void *) url);
-        free((void *) version);
-    } else {
-        // compatibility with older events
-        // This app does not support FOTA with older back ends, but the user can add the functionality
-        const char *command = iotcl_clone_command(data);
-        if (NULL != command) {
-            // URL will be inside the command
-            IOTC_DEBUG("Command is: %s", command);
-            message = "Old back end URLS are not supported by the app";
-            free((void *) command);
-        }
-    }
-    const char *ack = iotcl_create_ack_string_and_destroy_event(data, success, message);
-    if (NULL != ack) {
-        IOTC_DEBUG("Sent OTA ack: %s", ack);
-        iotconnect_sdk_send_packet(ack);
-        free((void *) ack);
-    }
+    iotcl_mqtt_send_cmd_ack(ack_id, (success ? IOTCL_C2D_EVT_OTA_SUCCESS : IOTCL_C2D_EVT_OTA_FAILED), message);
 }
-
 
 static void publish_telemetry() {
     IotclMessageHandle msg = iotcl_telemetry_create();
 
-    // Optional. The first time you create a data point, the current timestamp will be automatically added
-    // TelemetryAddWith* calls are only required if sending multiple data points in one packet.
-    iotcl_telemetry_add_with_iso_time(msg, iotcl_iso_timestamp_now());
+    // STRING template field type
     iotcl_telemetry_set_string(msg, "version", APP_VERSION);
-    iotcl_telemetry_set_number(msg, "cpu", 3.123); // test floating point numbers
 
-    const char *str = iotcl_create_serialized_string(msg, false);
+    // INTEGER template field type
+    iotcl_telemetry_set_number(msg, "random_int", (double) rand());
+
+    // DECIMAL template field type
+    iotcl_telemetry_set_number(msg, "random_decimal", (double) (rand() / RAND_MAX));
+
+    // BOOLEAN template field type
+    iotcl_telemetry_set_number(msg, "random_boolean", (rand() / RAND_MAX) > 0.5 ? true: false);
+
+    iotcl_mqtt_send_telemetry(msg, false);
     iotcl_telemetry_destroy(msg);
-    IOTC_DEBUG("Sending: %s", str);
-    iotconnect_sdk_send_packet(str); // underlying code will report an error
-    iotcl_destroy_serialized(str);
 }
 
-
 int main(int argc, char *argv[]) {
-    if (access(IOTCONNECT_SERVER_CERT, F_OK) != 0) {
-        IOTC_ERROR("Unable to access IOTCONNECT_SERVER_CERT. "
+    char *trust_store;
+
+    (void) argc;
+    (void) argv;
+
+#ifdef IOTCONNECT_MQTT_SERVER_CA_CERT
+    trust_store = IOTCONNECT_CA_CERT_PATH
+#else
+    if (IOTCONNECT_CONNECTION_TYPE == IOTC_CT_AWS) {
+        trust_store = IOTCONNECT_MQTT_SERVER_CA_CERT_DEFAULT_AWS;
+    } else {
+        trust_store = IOTCONNECT_MQTT_SERVER_CA_CERT_DEFAULT_AZURE;
+    }
+#endif
+
+    if (access(trust_store, F_OK) != 0) {
+        printf("Unable to access the MQTT CA certificate. "
                "Please change directory so that %s can be accessed from the application or update IOTCONNECT_CERT_PATH",
-               IOTCONNECT_SERVER_CERT);
+               trust_store);
+        return -1;
     }
 
     if (IOTCONNECT_AUTH_TYPE == IOTC_AT_X509) {
-        if (access(IOTCONNECT_IDENTITY_CERT, F_OK) != 0 ||
-            access(IOTCONNECT_IDENTITY_KEY, F_OK) != 0
+        if (access(IOTCONNECT_DEVICE_CERT, F_OK) != 0
                 ) {
-            IOTC_ERROR("Unable to access device identity private key and certificate. )"
-                   "Please change directory so that %s can be accessed from the application or update IOTCONNECT_CERT_PATH",
-                   IOTCONNECT_SERVER_CERT);
+            printf("Unable to access device identity certificate. "
+                   "Please change directory so that %s can be accessed from the application or update IOTCONNECT_DEVICE_CERT",
+                   IOTCONNECT_DEVICE_CERT);
+            return -1;
+        }
+        if (access(IOTCONNECT_DEVICE_PRIVATE_KEY, F_OK) != 0
+                ) {
+            printf("Unable to access device identity private key. "
+                   "Please change directory so that %s can be accessed from the application or update IOTCONNECT_DEVICE_PRIVATE_KEY",
+                   IOTCONNECT_DEVICE_PRIVATE_KEY);
+            return -1;
         }
     }
 
@@ -153,19 +163,19 @@ int main(int argc, char *argv[]) {
     config->cpid = IOTCONNECT_CPID;
     config->env = IOTCONNECT_ENV;
     config->duid = IOTCONNECT_DUID;
+    config->connection_type = IOTCONNECT_CONNECTION_TYPE;
     config->auth_info.type = IOTCONNECT_AUTH_TYPE;
-    config->auth_info.trust_store = IOTCONNECT_SERVER_CERT;
+    config->auth_info.trust_store = trust_store;
+    config->trace_data = true;
 
     if (config->auth_info.type == IOTC_AT_X509) {
-        config->auth_info.data.cert_info.device_cert = IOTCONNECT_IDENTITY_CERT;
-        config->auth_info.data.cert_info.device_key = IOTCONNECT_IDENTITY_KEY;
-    } else if (config->auth_info.type == IOTC_AT_TPM) {
-        config->auth_info.data.scope_id = IOTCONNECT_SCOPE_ID;
+        config->auth_info.data.cert_info.device_cert = IOTCONNECT_DEVICE_CERT;
+        config->auth_info.data.cert_info.device_key = IOTCONNECT_DEVICE_PRIVATE_KEY;
     } else if (config->auth_info.type == IOTC_AT_SYMMETRIC_KEY){
         config->auth_info.data.symmetric_key = IOTCONNECT_SYMMETRIC_KEY;
-    } else if (config->auth_info.type != IOTC_AT_TOKEN) { // token type does not need any secret or info
+    } else {
         // none of the above
-        IOTC_ERROR("IOTCONNECT_AUTH_TYPE is invalid");
+        IOTC_ERROR("Unknown IotConnectAuthType");
         return -1;
     }
 
@@ -174,6 +184,8 @@ int main(int argc, char *argv[]) {
     config->ota_cb = on_ota;
     config->cmd_cb = on_command;
 
+    // initialize random seed for the telemetry test
+    srand(time(NULL));
 
     // run a dozen connect/send/disconnect cycles with each cycle being about a minute
     for (int j = 0; j < 10; j++) {
@@ -186,15 +198,12 @@ int main(int argc, char *argv[]) {
         // send 10 messages
         for (int i = 0; iotconnect_sdk_is_connected() && i < 10; i++) {
             publish_telemetry();
-            // repeat approximately evey ~5 seconds
-            for (int k = 0; k < 500; k++) {
-                iotconnect_sdk_receive();
-                usleep(10000); // 10ms
-            }
+            // repeat evey ~5 seconds
+            sleep(5); // 10ms
         }
         iotconnect_sdk_disconnect();
     }
 
-    IOTC_DEBUG("exiting basic_sample()");
+    IOTC_DEBUG("Basic sample demo is complete. Exiting.");
     return 0;
 }

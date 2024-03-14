@@ -21,7 +21,8 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../lib/paho.mqtt.c/src)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../lib/paho.mqtt.c paho.mqtt.c EXCLUDE_FROM_ALL)
 
 # iotc-c-lib
-aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR}/../lib/iotc-c-lib/src CLibSources)
+aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR}/../lib/iotc-c-lib/core/src CLibSources)
+aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR}/../lib/iotc-c-lib/modules/device-rest-api CLibSources)
 
 include_directories(curl-http-impl/include)
 include_directories(include)
@@ -31,8 +32,9 @@ file(GLOB ImplSources paho-c-impl/src/*.c)
 
 add_library(iotc-c-generic-sdk STATIC ${cJSON} ${CLibSources} ${SdkSources} ${ImplSources})
 
-target_include_directories(iotc-c-generic-sdk PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../lib/cJSON)
-target_include_directories(iotc-c-generic-sdk PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../lib/iotc-c-lib/include)
+target_include_directories(iotc-c-generic-sdk PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../lib/iotc-c-lib//lib/cJSON)
+target_include_directories(iotc-c-generic-sdk PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../lib/iotc-c-lib/core/include)
+target_include_directories(iotc-c-generic-sdk PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../lib/iotc-c-lib/modules/device-rest-api)
 target_include_directories(iotc-c-generic-sdk PUBLIC include)
 
 IF (PAHO_BUILD_STATIC)

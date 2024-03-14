@@ -1,11 +1,12 @@
-//
-// Copyright: Avnet 2021
-// Created by Nik Markovic <nikola.markovic@avnet.com> on 6/28/21.
-//
+/* SPDX-License-Identifier: MIT
+ * Copyright (C) 2020-2024 Avnet
+ * Authors: Nikola Markovic <nikola.markovic@avnet.com> et al.
+ */
 
 #include <stdlib.h>
 #include <string.h>
 #include <curl/curl.h>
+#include "iotconnect.h"
 #include "iotc_http_request.h"
 
 struct MemoryStruct {
@@ -20,7 +21,7 @@ static size_t write_memory_cb(void *contents, size_t size, size_t nmemb, void *u
     char *ptr = realloc(mem->memory, mem->size + realsize + 1);
     if (!ptr) {
         /* out of memory! */
-        printf("not enough memory (realloc returned NULL)\n");
+        IOTC_ERROR("not enough memory (realloc returned NULL)");
         return 0;
     }
 
@@ -41,7 +42,7 @@ int iotconnect_https_request(
     CURLcode res = (!CURLE_OK); /* FIXME there's probably a better value to initialize this too */
 
     if (NULL == response) {
-        fprintf(stderr, "iotconnect_https_request() requires a valid IotConnectHttpResponse pointer.");
+        IOTC_ERROR("iotconnect_https_request() requires a valid IotConnectHttpResponse pointer.");
         return res;
     }
     response->data = NULL;
@@ -58,6 +59,7 @@ int iotconnect_https_request(
 
         struct curl_slist *header_slist = NULL;
         header_slist = curl_slist_append(header_slist, "Content-Type: application/json");
+        curl_easy_setopt(curl, CURLOPT_FAILONERROR, 400);
         curl_easy_setopt(curl, CURLOPT_HTTPHEADER, header_slist);
         curl_easy_setopt(curl, CURLOPT_URL, url);
         if (send_str) {
@@ -71,7 +73,11 @@ int iotconnect_https_request(
         res = curl_easy_perform(curl);
         /* Check for errors */
         if (res != CURLE_OK) {
-            fprintf(stderr, "iotconnect_https_request() failed: %s\n", curl_easy_strerror(res));
+            IOTC_ERROR("iotconnect_https_request() failed: %s", curl_easy_strerror(res));
+            free(chunk.memory);
+            chunk.memory = NULL;
+        } else if (chunk.size == 0) {
+            IOTC_ERROR("iotconnect_https_request(): No data returned");
             free(chunk.memory);
             chunk.memory = NULL;
         }

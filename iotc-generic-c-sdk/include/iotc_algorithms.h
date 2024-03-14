@@ -1,7 +1,7 @@
-//
-// Copyright: Avnet 2021
-// Created by Nik Markovic <nikola.markovic@avnet.com> on 7/1/21.
-//
+/* SPDX-License-Identifier: MIT
+ * Copyright (C) 2020-2024 Avnet
+ * Authors: Nikola Markovic <nikola.markovic@avnet.com> et al.
+ */
 
 #ifndef IOTC_ALGORITHMS_H
 #define IOTC_ALGORITHMS_H
@@ -12,7 +12,7 @@
 extern   "C" {
 #endif
 
-char *gen_sas_token(const char *host, const char *cpid, const char *duid, const char *b64key, time_t expiry_secs);
+char *gen_sas_token(const char *host, const char* client_id, const char *b64key, time_t expiry_secs);
 
 #ifdef __cplusplus
 }
