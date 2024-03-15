@@ -190,7 +190,7 @@ int main(int argc, char *argv[]) {
     config->cmd_cb = on_command;
 
     // initialize random seed for the telemetry test
-    srand(time(NULL));
+    srand((unsigned int) time(NULL));
 
     // run a dozen connect/send/disconnect cycles with each cycle being about a minute
     for (int j = 0; j < 10; j++) {
@@ -204,7 +204,7 @@ int main(int argc, char *argv[]) {
         for (int i = 0; iotconnect_sdk_is_connected() && i < 10; i++) {
             publish_telemetry();
             // repeat evey ~5 seconds
-            sleep(5); // 10ms
+            usleep(5000000);
         }
         iotconnect_sdk_disconnect();
     }
