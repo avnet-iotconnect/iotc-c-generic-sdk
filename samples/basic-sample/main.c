@@ -97,7 +97,7 @@ static void on_ota(IotclC2dEventData data) {
         }
     }
 
-    iotcl_mqtt_send_cmd_ack(ack_id, (success ? IOTCL_C2D_EVT_OTA_SUCCESS : IOTCL_C2D_EVT_OTA_FAILED), message);
+    iotcl_mqtt_send_ota_ack(ack_id, (success ? IOTCL_C2D_EVT_OTA_SUCCESS : IOTCL_C2D_EVT_OTA_DOWNLOAD_FAILED), message);
 }
 
 static void publish_telemetry() {
