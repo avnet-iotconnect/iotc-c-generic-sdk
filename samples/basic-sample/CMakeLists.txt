@@ -11,4 +11,10 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../../iotc-generic-c-sdk SdkSources
 include_directories(config)
 
 add_executable(basic-sample main.c)
+
+# expect warnings about usleep and unused arguments from paho
+target_compile_options(basic-sample PRIVATE -std=c99 -Wall -Wextra)
+target_compile_options(basic-sample PRIVATE -std=c99 -Wall -Wextra)
+target_compile_options(iotc-c-generic-sdk PRIVATE -std=c99 -Wall -Wextra)
+
 target_link_libraries(basic-sample iotc-c-generic-sdk)

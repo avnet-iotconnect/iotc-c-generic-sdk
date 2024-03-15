@@ -9,11 +9,11 @@
 #include "iotconnect.h"
 
 // from iotconnect.h IotConnectConnectionType
-#define IOTCONNECT_CONNECTION_TYPE IOTC_CT_AZURE
+#define IOTCONNECT_CONNECTION_TYPE IOTC_CT_AWS
 
-#define IOTCONNECT_CPID "avtds"
-#define IOTCONNECT_ENV  "Avnet"
-#define IOTCONNECT_DUID "nik-deleteme"
+#define IOTCONNECT_CPID "97FF86E8728645E9B89F7B07977E4B15"
+#define IOTCONNECT_ENV  "POC"
+#define IOTCONNECT_DUID "niktest-gen-ec"
 
 #if 0
 #define IOTCONNECT_CPID "your-cpid"
@@ -27,16 +27,16 @@
 #define IOTCONNECT_AUTH_TYPE IOTC_AT_X509
 
 // if using Symmetric Key based authentication, provide the primary or secondary key here:
-#define IOTCONNECT_SYMMETRIC_KEY ""
+#define IOTCONNECT_SYMMETRIC_KEY "="
 
 // The server CA Certificate used to validate the Azure IoTHub or AWS IoT Core TLS Connection
 // and it is required for all authentication types:
 // #define IOTCONNECT_MQTT_SERVER_CA_CERT
 // or use else we will use defaults below...:
 // default AWS cert for RSA cert/key. Use CA3 or others where appropriate:
-#define IOTCONNECT_MQTT_SERVER_CA_CERT_DEFAULT_AWS "../../../lib/iotc-c-lib/tools/cert-files/AmazonRootCA1.pem"
+#define IOTCONNECT_MQTT_SERVER_CA_CERT_DEFAULT_AWS "../../../lib/iotc-c-lib/tools/server-ca-cert-files/AmazonRootCA1.pem"
 // default Azure cert if using IOTC_CT_AZURE
-#define IOTCONNECT_MQTT_SERVER_CA_CERT_DEFAULT_AZURE "../../../lib/iotc-c-lib/tools/cert-files/DigiCertGlobalRootG2.pem"
+#define IOTCONNECT_MQTT_SERVER_CA_CERT_DEFAULT_AZURE "../../../lib/iotc-c-lib/tools/server-ca-cert-files/DigiCertGlobalRootG2.pem"
 
 // if IOTC_X509 is used reference your device identity cert and private key here
 #define IOTCONNECT_DEVICE_CERT ("../identity/client-crt.pem")

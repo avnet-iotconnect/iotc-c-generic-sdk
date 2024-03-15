@@ -38,7 +38,8 @@ This project has git submodules that need to be pulled before building.
 Ensure to pass the **--recurse-submodules** flag to your git clone command 
 when cloning the repo.
 
-If the project was already cloned without submodules, run the following command 
+If the project was already cloned without submodules or if you need to pull 
+the necessary modules for a different branch after pulling, run the following command 
 ```shell script
 cd /root-of-this-repo
 git submodule update --init --recursive

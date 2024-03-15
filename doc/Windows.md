@@ -1,32 +1,39 @@
 
 #### Building and Running with Visual Studio 2019
-
+Build Tools for Visual Studio 2022
+*** TBD *** https://visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio-2022
 * Download and install [Visual Studio 2019](https://visualstudio.microsoft.com/downloads/).
-* Download and install [CMake](https://cmake.org/download/). Ensure to add CMake to system path.
+* Download and install [CMake](https://cmake.org/download/) with the installer. Ensure to add CMake to system path.
 * Download and extract [Vcpkg](https://github.com/microsoft/vcpkg/releases).
 
-Run PowerShell and execute (use x86 instead of x64 if on a 32-bit machine):
+clone the vcpkg Git repo into a directory with preferably a short global path from root of your drive,
+bootstrap vcpkg and install the necessary dependencies. For example in command prompt:
+```shell script
+```
+
+Run a command prompt and execute (use x86 instead of x64 if on a 32-bit machine):
 
 ```shell script
-cd <vcpkg install directory>
-.\bootstrap-vcpkg.bat
-.\vcpkg.exe integrate install
-.\vcpkg.exe install curl:x64-windows
-.\vcpkg.exe install openssl:x64-windows
+md c:\tools
+cd C:\tools
+git clone https://github.com/microsoft/vcpkg
+.\vcpkg\bootstrap-vcpkg.bat
+.\vcpkg\vcpkg.exe integrate install
+.\vcpkg\vcpkg.exe install curl:x64-windows
+.\vcpkg\vcpkg.exe install openssl:x64-windows
 exit
 ```
 
-By exiting the PowerShell we ensure that we pick up the "integrate install" environment. 
+By exiting the command prompt we ensure that we pick up the "integrate install" environment. 
 
-Run a new PowerShell or use developer console in Visual Studio. If running PowerShell 
-ensure to change the directory to where this repo is extracted or cloned. 
+Run a new command prompt ensure. 
 
 
 ```shell script
-cd samples/basic-sample
-mkdir build
+cd <this repo clone directory>\samples\basic-sample
+md build
 cd build
-cmake .. -DCMAKE_TOOLCHAIN_FILE=<vcpkg install directory>/scripts/buildsystems/vcpkg.cmake 
+cmake .. -DCMAKE_TOOLCHAIN_FILE=<vcpkg install directory>\scripts\buildsystems\vcpkg.cmake 
 cmake --build . --target basic-sample 
 .\Debug\basic-sample.exe
 ```
