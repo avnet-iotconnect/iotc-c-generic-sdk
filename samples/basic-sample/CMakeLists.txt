@@ -7,9 +7,6 @@ add_compile_options(-DIOTCL_USER_CONFIG_FILE=\"iotcl_config.h\" -I${CMAKE_CURREN
 
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../../iotc-generic-c-sdk SdkSources)
 
-# workaround for clion?
-set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DOPENSSL")
-
 # adding this for cleanness but the add_compile_options above already took care of it
 include_directories(config)
 
