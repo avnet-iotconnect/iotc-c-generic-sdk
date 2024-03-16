@@ -17,11 +17,8 @@
 #define F_OK 0
 #include <Windows.h>
 #include <io.h>
-int usleep(unsigned long usec) {
-    Sleep(usec / 1000);
-    return 0;
-}
-#define access    _access_s
+#define sleep       Sleep
+#define access      _access_s
 #else
 #include <unistd.h>
 #endif
@@ -204,7 +201,7 @@ int main(int argc, char *argv[]) {
         for (int i = 0; iotconnect_sdk_is_connected() && i < 10; i++) {
             publish_telemetry();
             // repeat evey ~5 seconds
-            usleep(5000000);
+            sleep(5);
         }
         iotconnect_sdk_disconnect();
     }

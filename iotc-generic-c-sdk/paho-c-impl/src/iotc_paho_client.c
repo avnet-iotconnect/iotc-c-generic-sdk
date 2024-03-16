@@ -30,8 +30,11 @@ static void paho_deinit(void) {
 }
 
 static int on_c2d_message(void *context, char *topicName, int topicLen, MQTTClient_message *message) {
+    (void) context;
+    (void) topicLen;
+
     if (c2d_msg_cb) {
-        c2d_msg_cb(message->payload, message->payloadlen);
+        c2d_msg_cb(message->payload, (size_t) message->payloadlen);
     }
     MQTTClient_freeMessage(&message);
     MQTTClient_free(topicName);
@@ -39,6 +42,8 @@ static int on_c2d_message(void *context, char *topicName, int topicLen, MQTTClie
 }
 
 static void on_connection_lost(void *context, char *cause) {
+    (void) context;
+
     IOTC_DEBUG("MQTT Connection lost. Cause: %s", cause);
 
     if (status_cb) {
@@ -100,7 +105,7 @@ int iotc_device_client_init(IotConnectDeviceClientConfig *c) {
 
     paho_deinit(); // reset all locals
 
-    char *paho_host_url = malloc(snprintf(NULL, 0, HOST_URL_FORMAT, mc->host) + 1);
+    char *paho_host_url = malloc((size_t) snprintf(NULL, 0, HOST_URL_FORMAT, mc->host) + 1);
     if (NULL == paho_host_url) {
         IOTC_ERROR("ERROR: Unable to allocate memory for paho host URL!");
         return -1;
