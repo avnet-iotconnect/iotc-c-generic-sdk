@@ -139,8 +139,7 @@ static void on_mqtt_c2d_message(const unsigned char *message, size_t message_len
     iotcl_c2d_process_event_with_length(message, message_len);
 }
 
-void iotconnect_sdk_mqtt_send_cb(const char *topic, size_t topic_len, const char *json_str) {
-    (void) topic_len;
+void iotconnect_sdk_mqtt_send_cb(const char *topic, const char *json_str) {
     if (config.trace_data) {
         IOTC_DEBUG(">: %s",  json_str);
     }
