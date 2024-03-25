@@ -7,6 +7,7 @@
 #define IOTC_ALGORITHMS_H
 
 #include <stdlib.h>
+#include <time.h>
 
 #ifdef __cplusplus
 extern   "C" {

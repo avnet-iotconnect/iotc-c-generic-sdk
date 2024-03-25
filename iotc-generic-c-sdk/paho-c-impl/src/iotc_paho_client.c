@@ -7,8 +7,9 @@
 #include <string.h>
 #include "MQTTClient.h"
 #include "iotc_log.h"
-#include "iotc_device_client.h"
 #include "iotc_algorithms.h"
+#include "iotconnect.h"
+#include "iotc_device_client.h"
 
 #define HOST_URL_FORMAT "ssl://%s:8883"
 
@@ -19,7 +20,7 @@
 static bool is_initialized = false;
 static MQTTClient client = NULL;
 static IotConnectC2dCallback c2d_msg_cb = NULL; // callback for inbound messages
-static IotConnectStatusCallback status_cb = NULL; // callback for connection status
+static IotConnectMqttStatusCallback status_cb = NULL; // callback for connection status
 
 static void paho_deinit(void) {
     if (client) {
@@ -84,6 +85,13 @@ int iotc_device_client_send_message_qos(const char* topic, const char *message, 
     }
 
     rc = MQTTClient_waitForCompletion(client, token, MQTT_PUBLISH_TIMEOUT_MS);
+    if (status_cb) {
+        if (0 == rc) {
+            status_cb(IOTC_CS_MQTT_DELIVERED);
+        } else {
+            status_cb(IOTC_CS_MQTT_SEND_FAILED);
+        }
+    }
     //IOTC_INFO("Message with delivery token %d delivered", token);
     return rc;
 }

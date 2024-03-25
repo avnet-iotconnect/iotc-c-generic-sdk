@@ -12,9 +12,7 @@
 #define IOTCONNECT_CONNECTION_TYPE IOTC_CT_AWS
 
 #define IOTCONNECT_CPID "your-cpid"
-#define IOTCONNECT_ENV  "your-enviroment"
-
-// Device Unique ID
+#define IOTCONNECT_ENV  "your-environment"
 #define IOTCONNECT_DUID "your-device-unique-id"
 
 // from iotconnect.h IotConnectAuthType

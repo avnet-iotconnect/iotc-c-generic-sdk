@@ -39,10 +39,12 @@ typedef enum {
 
 typedef enum {
     IOTC_CS_MQTT_CONNECTED = 1,
-    IOTC_CS_MQTT_DISCONNECTED
-} IotConnectConnectionStatus;
+    IOTC_CS_MQTT_DISCONNECTED,
+    IOTC_CS_MQTT_DELIVERED, // Message delivered(qos=0) or acknowledged (qos>0)
+    IOTC_CS_MQTT_SEND_FAILED // // Message message delivery failed (qos=0) or not acknowledged (qos>0)
+} IotConnectMqttStatus;
 
-typedef void (*IotConnectStatusCallback)(IotConnectConnectionStatus data);
+typedef void (*IotConnectMqttStatusCallback)(IotConnectMqttStatus data);
 
 typedef struct {
     IotConnectAuthType type;
@@ -65,7 +67,7 @@ typedef struct {
     IotConnectAuthInfo auth_info;
     IotclOtaCallback ota_cb; // callback for OTA events.
     IotclCommandCallback cmd_cb; // callback for command events.
-    IotConnectStatusCallback status_cb; // callback for connection status
+    IotConnectMqttStatusCallback status_cb; // callback for connection status
     bool verbose; // If true, we will output extra info and sent and received MQTT json data to standard out
 } IotConnectClientConfig;
 

@@ -25,14 +25,20 @@
 
 #define APP_VERSION "00.01.00"
 
-static void on_connection_status(IotConnectConnectionStatus status) {
+static void on_connection_status(IotConnectMqttStatus status) {
     // Add your own status handling
     switch (status) {
         case IOTC_CS_MQTT_CONNECTED:
-            printf("IoTConnect Client Connected notification\n");
+            printf("IoTConnect Client Connected notification.\n");
             break;
         case IOTC_CS_MQTT_DISCONNECTED:
-            printf("IoTConnect Client Disconnected notification\n");
+            printf("IoTConnect Client Disconnected notification.\n");
+            break;
+        case IOTC_CS_MQTT_DELIVERED:
+            printf("IoTConnect Client message delivered.\n");
+            break;
+        case IOTC_CS_MQTT_SEND_FAILED:
+            printf("IoTConnect Client message send failed!\n");
             break;
         default:
             printf("IoTConnect Client ERROR notification\n");

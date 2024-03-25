@@ -19,7 +19,7 @@ typedef struct {
     int qos; // default QOS is 1
     IotConnectAuthInfo *auth; // Pointer to IoTConnect auth configuration
     IotConnectC2dCallback c2d_msg_cb; // callback for inbound messages
-    IotConnectStatusCallback status_cb; // callback for connection status
+    IotConnectMqttStatusCallback status_cb; // callback for connection and message status
 } IotConnectDeviceClientConfig;
 
 int iotc_device_client_connect(IotConnectDeviceClientConfig *c);
