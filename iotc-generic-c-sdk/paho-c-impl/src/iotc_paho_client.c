@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "MQTTClient.h"
+#include "iotc_log.h"
 #include "iotc_device_client.h"
 #include "iotc_algorithms.h"
 
@@ -44,7 +45,7 @@ static int on_c2d_message(void *context, char *topicName, int topicLen, MQTTClie
 static void on_connection_lost(void *context, char *cause) {
     (void) context;
 
-    IOTC_DEBUG("MQTT Connection lost. Cause: %s", cause);
+    IOTC_INFO("MQTT Connection lost. Cause: %s", cause);
 
     if (status_cb) {
         status_cb(IOTC_CS_MQTT_DISCONNECTED);
@@ -83,7 +84,7 @@ int iotc_device_client_send_message_qos(const char* topic, const char *message, 
     }
 
     rc = MQTTClient_waitForCompletion(client, token, MQTT_PUBLISH_TIMEOUT_MS);
-    //IOTC_DEBUG("Message with delivery token %d delivered", token);
+    //IOTC_INFO("Message with delivery token %d delivered", token);
     return rc;
 }
 
@@ -91,7 +92,7 @@ int iotc_device_client_send_message(const char* topic, const char *message) {
     return iotc_device_client_send_message_qos(topic, message, 1);
 }
 
-int iotc_device_client_init(IotConnectDeviceClientConfig *c) {
+int iotc_device_client_connect(IotConnectDeviceClientConfig *c) {
     MQTTClient_connectOptions conn_opts = MQTTClient_connectOptions_initializer;
     MQTTClient_SSLOptions ssl_opts = MQTTClient_SSLOptions_initializer;
     char * password = NULL;

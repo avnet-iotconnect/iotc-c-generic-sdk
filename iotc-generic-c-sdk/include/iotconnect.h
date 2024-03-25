@@ -18,36 +18,12 @@ extern "C" {
 #include <stdio.h>
 
 /*
- * To use iotconnect need to specify debug routines IOTC_DEBUG, IOTC_WARN and IOTC_ERROR
+ * To use iotconnect need to specify debug routines IOTC_INFO, IOTC_WARN and IOTC_ERROR
  *
  * Two example implementations are shown below.
  * Another possible implementation would be to use syslog().
  */
-// #define USE_SYSLOG 1
-#if USE_SYSLOG
-#include <syslog.h>
-#define IOTC_ERROR(...) syslog(LOG_ERR, __VA_ARGS__)
-#define IOTC_WARN(...) syslog(LOG_WARNING, __VA_ARGS__)
-#define IOTC_DEBUG(...) syslog(LOG_DEBUG, __VA_ARGS__)
-#else
-#define IOTC_ENDLN "\n"
 
-#define IOTC_DEBUG_LEVEL 2
-
-#define IOTC_ERROR(...) fprintf(stderr, __VA_ARGS__);fprintf(stderr, IOTC_ENDLN)
-#define IOTC_WARN(...)
-#define IOTC_DEBUG(...)
-
-#if IOTC_DEBUG_LEVEL > 0
-#undef IOTC_WARN
-#define IOTC_WARN(...) fprintf(stderr, __VA_ARGS__);fprintf(stderr, IOTC_ENDLN)
-#if IOTC_DEBUG_LEVEL > 1
-#undef IOTC_DEBUG
-#define IOTC_DEBUG(...) printf(__VA_ARGS__);printf(IOTC_ENDLN)
-#endif
-#endif
-
-#endif // USE_SYSLOG
 
 typedef enum {
     IOTC_CT_AWS = 1,
@@ -77,7 +53,6 @@ typedef struct {
             char* device_key; // Path to a file containing the device private key in PEM format
         } cert_info;
         char *symmetric_key;
-        char *scope_id; // for TPM authentication. AKA: ID Scope
     } data;
 } IotConnectAuthInfo;
 
@@ -91,18 +66,23 @@ typedef struct {
     IotclOtaCallback ota_cb; // callback for OTA events.
     IotclCommandCallback cmd_cb; // callback for command events.
     IotConnectStatusCallback status_cb; // callback for connection status
-    bool trace_data; // If true, we will output sent and received json data to standard out
+    bool verbose; // If true, we will output extra info and sent and received MQTT json data to standard out
 } IotConnectClientConfig;
 
 
-IotConnectClientConfig *iotconnect_sdk_init_and_get_config(void);
+void iotconnect_sdk_init_config(IotConnectClientConfig * c);
 
-// call iotconnect_sdk_init_and_get_config first and configure the SDK before calling iotconnect_sdk_init()
-int iotconnect_sdk_init(void);
+// call iotconnect_sdk_init_config first and configure the SDK before calling iotconnect_sdk_init()
+// NOTE: the client does not need to keep references to the struct or any values inside it
+int iotconnect_sdk_init(IotConnectClientConfig * c);
+
+int iotconnect_sdk_connect(void);
 
 bool iotconnect_sdk_is_connected(void);
 
 void iotconnect_sdk_disconnect(void);
+
+void iotconnect_sdk_deinit(void);
 
 #ifdef __cplusplus
 }

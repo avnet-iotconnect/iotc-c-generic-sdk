@@ -11,23 +11,17 @@
 // from iotconnect.h IotConnectConnectionType
 #define IOTCONNECT_CONNECTION_TYPE IOTC_CT_AWS
 
-#define IOTCONNECT_CPID "97FF86E8728645E9B89F7B07977E4B15"
-#define IOTCONNECT_ENV  "POC"
-#define IOTCONNECT_DUID "niktest-gen-ec"
-
-#if 0
 #define IOTCONNECT_CPID "your-cpid"
 #define IOTCONNECT_ENV  "your-enviroment"
 
 // Device Unique ID
-// If using TPM, and this value is a blank string, Registration ID will be used from output of tpm_device_provision. Otherwise, the provide Device Uinque ID will be used.
 #define IOTCONNECT_DUID "your-device-unique-id"
-#endif
+
 // from iotconnect.h IotConnectAuthType
 #define IOTCONNECT_AUTH_TYPE IOTC_AT_X509
 
 // if using Symmetric Key based authentication, provide the primary or secondary key here:
-#define IOTCONNECT_SYMMETRIC_KEY "="
+#define IOTCONNECT_SYMMETRIC_KEY ""
 
 // The server CA Certificate used to validate the Azure IoTHub or AWS IoT Core TLS Connection
 // and it is required for all authentication types:

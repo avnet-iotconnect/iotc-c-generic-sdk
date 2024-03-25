@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: MIT
  * Copyright (C) 2020-2024 Avnet
- * Authors: Nikola Markovic <nikola.markovic@avnet.com> et al.
+ * Authors: Neil Matthews <nmatthews@witekio.com>, Nikola Markovic <nikola.markovic@avnet.com> et al.
  */
 
 #include <stdlib.h>

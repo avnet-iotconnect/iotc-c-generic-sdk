@@ -22,23 +22,17 @@ typedef struct {
     IotConnectStatusCallback status_cb; // callback for connection status
 } IotConnectDeviceClientConfig;
 
-int iotc_device_client_init(IotConnectDeviceClientConfig *c);
+int iotc_device_client_connect(IotConnectDeviceClientConfig *c);
 
 int iotc_device_client_disconnect(void);
 
 bool iotc_device_client_is_connected(void);
 
-// sends message with QOS 1
-// If called wthin an Azure C SDK callback (like on_message), the the message confirmation cannot be established
-// and the return code will be non-zero
-// returns:
-// -1 if message confirmation timed out
-// -2 if message confirmation cannot be established
-// -3 if the client is not connected
-
+// Sends the message with the underlying MQTT client (Paho) with configured default QOS and returns the error if
+// sending or confirming (acknowledging) the message fails. The error will be client-specific.
 int iotc_device_client_send_message(const char* topic, const char *message);
 
-// sends message with specified qos
+// Same as iotc_device_client_send_message() with with specified qos
 int iotc_device_client_send_message_qos(const char* topic, const char *message, int qos);
 
 void iotc_device_client_receive(void);

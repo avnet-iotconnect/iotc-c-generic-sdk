@@ -29,13 +29,13 @@ static void on_connection_status(IotConnectConnectionStatus status) {
     // Add your own status handling
     switch (status) {
         case IOTC_CS_MQTT_CONNECTED:
-            printf("IoTConnect Client Connected\n");
+            printf("IoTConnect Client Connected notification\n");
             break;
         case IOTC_CS_MQTT_DISCONNECTED:
-            printf("IoTConnect Client Disconnected\n");
+            printf("IoTConnect Client Disconnected notification\n");
             break;
         default:
-            printf("IoTConnect Client ERROR\n");
+            printf("IoTConnect Client ERROR notification\n");
             break;
     }
 }
@@ -161,20 +161,21 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    IotConnectClientConfig *config = iotconnect_sdk_init_and_get_config();
-    config->cpid = IOTCONNECT_CPID;
-    config->env = IOTCONNECT_ENV;
-    config->duid = IOTCONNECT_DUID;
-    config->connection_type = IOTCONNECT_CONNECTION_TYPE;
-    config->auth_info.type = IOTCONNECT_AUTH_TYPE;
-    config->auth_info.trust_store = trust_store;
-    config->trace_data = true;
+    IotConnectClientConfig config;
+    iotconnect_sdk_init_config(&config);
+    config.cpid = IOTCONNECT_CPID;
+    config.env = IOTCONNECT_ENV;
+    config.duid = IOTCONNECT_DUID;
+    config.connection_type = IOTCONNECT_CONNECTION_TYPE;
+    config.auth_info.type = IOTCONNECT_AUTH_TYPE;
+    config.auth_info.trust_store = trust_store;
+    config.verbose = true;
 
-    if (config->auth_info.type == IOTC_AT_X509) {
-        config->auth_info.data.cert_info.device_cert = IOTCONNECT_DEVICE_CERT;
-        config->auth_info.data.cert_info.device_key = IOTCONNECT_DEVICE_PRIVATE_KEY;
-    } else if (config->auth_info.type == IOTC_AT_SYMMETRIC_KEY){
-        config->auth_info.data.symmetric_key = IOTCONNECT_SYMMETRIC_KEY;
+    if (config.auth_info.type == IOTC_AT_X509) {
+        config.auth_info.data.cert_info.device_cert = IOTCONNECT_DEVICE_CERT;
+        config.auth_info.data.cert_info.device_key = IOTCONNECT_DEVICE_PRIVATE_KEY;
+    } else if (config.auth_info.type == IOTC_AT_SYMMETRIC_KEY){
+        config.auth_info.data.symmetric_key = IOTCONNECT_SYMMETRIC_KEY;
     } else {
         // none of the above
         printf("Unknown IotConnectAuthType\n");
@@ -182,16 +183,22 @@ int main(int argc, char *argv[]) {
     }
 
 
-    config->status_cb = on_connection_status;
-    config->ota_cb = on_ota;
-    config->cmd_cb = on_command;
+    config.status_cb = on_connection_status;
+    config.ota_cb = on_ota;
+    config.cmd_cb = on_command;
 
     // initialize random seed for the telemetry test
     srand((unsigned int) time(NULL));
 
     // run a dozen connect/send/disconnect cycles with each cycle being about a minute
+    int ret = iotconnect_sdk_init(&config);
+    if (0 != ret) {
+        printf("iotconnect_sdk_init() exited with error code %d\n", ret);
+        return ret;
+    }
+
     for (int j = 0; j < 10; j++) {
-        int ret = iotconnect_sdk_init();
+        ret = iotconnect_sdk_connect();
         if (0 != ret) {
             printf("iotconnect_sdk_init() exited with error code %d\n", ret);
             return ret;
@@ -205,6 +212,8 @@ int main(int argc, char *argv[]) {
         }
         iotconnect_sdk_disconnect();
     }
+
+    iotconnect_sdk_deinit();
 
     printf("Basic sample demo is complete. Exiting.\n");
     return 0;

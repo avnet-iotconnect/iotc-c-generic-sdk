@@ -3,8 +3,8 @@
  * Authors: Nikola Markovic <nikola.markovic@avnet.com> et al.
  */
 
-#ifndef IOTC_DISCOVERY_CLIENT_H
-#define IOTC_DISCOVERY_CLIENT_H
+#ifndef IOTC_HTTP_REQUEST_H
+#define IOTC_HTTP_REQUEST_H
 #ifdef __cplusplus
 extern   "C" {
 #endif

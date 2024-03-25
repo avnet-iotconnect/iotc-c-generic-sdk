@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <curl/curl.h>
+#include "iotc_log.h"
 #include "iotconnect.h"
 #include "iotc_http_request.h"
 

@@ -13,13 +13,7 @@ Use the rel-protocol-1.0 branch for protocol 1.0 devices, or if TPM or if
 To get started quickly, see the [IoTConnect Generic C SDK Windows](https://www.youtube.com/watch?v=cvP3zmcs8JA) and [SmartEdge Industrial IoT Gateway](https://www.youtube.com/watch?v=j6AC95nz7IY) demo videos on YouTube.
 The videos use the older protocol 1.0 support version, but most of the concepts can be applied to this implementation. 
  
-#### Dependencies
-
-The project depends on the following:
- * curl 
- * [Paho C MQTT](https://github.com/eclipse/paho.mqtt.c.git)
- * OpenSSL library (reused from Paho dependency).
-
+## Dependencies
 
 The project uses the following dependent projects as git submodules:
 
@@ -28,20 +22,25 @@ The project uses the following dependent projects as git submodules:
 * [paho.mqtt.c](https://github.com/eclipse/paho.mqtt.c.git) from source - v1.3.13
 * [libcurl](https://curl.se/libcurl/) as a dynamically linked library.  
 * [oenssl](https://www.openssl.org/) as a dynamically linked library, as a dependency from paho and curl.
+
+The project depends on the following linked libraries:
+ * [libcurl](https://curl.se/libcurl/)
+ * OpenSSL library (reused from Paho dependency).
+
     
 Both the shared libraries and the C source headers are required to be present on the build host for building. 
 Curl and openssl runtime shared libraries (so, dll etc.) must be present on the device when running the project. 
 
-#### Initializing/Downloading The Project
+## Project Setup
 
 This project has git submodules that need to be pulled before building.
 Ensure to pass the **--recurse-submodules** flag to your git clone command 
 when cloning the repo.
 
 If the project was already cloned without submodules or if you need to pull 
-the necessary modules for a different branch after pulling, run the following command 
+the necessary modules for a different branch after pulling, run the following command
+in the root of this repo: 
 ```shell script
-cd /root-of-this-repo
 git submodule update --init --recursive
 ``` 
 or execute *scripts/setup-project.sh* with bash.
