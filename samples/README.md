@@ -1,7 +1,10 @@
 ### Introduction
 
-This sample provides sample application code that can be configured at build time
-with the following parameters in *config/app_config.h*:
+**NOTE** This branch provides the IoTConnect protocol version 1.0 
+implementation and is in maintenance mode. 
+Additionally, this branch also provides the Azure IoTHub TPM implementation.
+
+For new projects and AWS IoT Core, please use the main branch with IoTconnect protocol 2.1 support.
 
 ### Device Configuration Instructions
 
