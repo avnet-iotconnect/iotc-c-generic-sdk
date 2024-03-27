@@ -74,7 +74,7 @@ int iotconnect_https_request(
         res = curl_easy_perform(curl);
         /* Check for errors */
         if (res != CURLE_OK) {
-            IOTC_ERROR("iotconnect_https_request() failed: %s", curl_easy_strerror(res));
+            IOTC_ERROR("iotconnect_https_request() failed with error: \"%s\"", curl_easy_strerror(res));
             free(chunk.memory);
             chunk.memory = NULL;
         } else if (chunk.size == 0) {
