@@ -1,19 +1,18 @@
-//
-// Copyright: Avnet 2021
-// Created by Nik Markovic <nikola.markovic@avnet.com> on 6/26/21.
-//
+/* SPDX-License-Identifier: MIT
+ * Copyright (C) 2020-2024 Avnet
+ * Authors: Neil Matthews <nmatthews@witekio.com>, Nikola Markovic <nikola.markovic@avnet.com> et al.
+ */
 
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
-#include "iotconnect_common.h"
 #include <openssl/evp.h>
 #include <openssl/hmac.h>
 #include <openssl/buffer.h>
 
 #ifndef IOTHUB_RESOURCE_URI_FORMAT
-#define IOTHUB_RESOURCE_URI_FORMAT "%s/devices/%s-%s"
+#define IOTHUB_RESOURCE_URI_FORMAT "%s/devices/%s"
 #endif
 
 // resourceURI + \n + target expiry epoch timestamp
@@ -108,39 +107,36 @@ static char *uri_encode(const char *uri) {
     return outbuff;
 }
 
-char *gen_sas_token(const char *host, const char *cpid, const char *duid, const char *b64key, unsigned long expiry_secs) {
+char *gen_sas_token(const char *host, const char *client_id, const char *b64key, unsigned long expiry_secs) {
     // example: SharedAccessSignature sr=poc-iotconnect-iothub-eu.azure-devices.net%2Fdevices%2CPID-DUUID&sig=WBBsC0rhu1idLR6aWaKiMbcrBCm9jPI4st2clhVKrW4%3D&se=1656689541
     // SharedAccessSignature sr={URL-encoded-resourceURI}&sig={signature-string}&se={expiry}
     // URL-encoded-resourceURI: myHub.azure-devices.net/devices/mydevice
     // expiry: unix time of expiry of signature
     // signature-string: {URL-encoded-resourceURI} + "\n" + expiry
-    const size_t len_host = strlen(host);
-    const size_t len_cpid = strlen(cpid);
-    const size_t len_duid = strlen(duid);
-    const size_t len_resource_uri = (sizeof(IOTHUB_RESOURCE_URI_FORMAT) + len_host + len_cpid + len_duid) * 3;
+    const size_t len_resource_uri = snprintf(NULL, 0, IOTHUB_RESOURCE_URI_FORMAT, client_id, host);
 
     unsigned long int expiration = ((unsigned long int) time(NULL)) + expiry_secs;
-    char *resource_uri = malloc(len_resource_uri);
+    char *resource_uri = malloc(len_resource_uri + 1);
     if(!resource_uri) {
         return NULL;
     }
 
-    sprintf(resource_uri, IOTHUB_RESOURCE_URI_FORMAT,
-            host,
-            cpid,
-            duid
-    );
+    sprintf(resource_uri, IOTHUB_RESOURCE_URI_FORMAT, host, client_id);
     char *encoded_resource_uri = uri_encode(resource_uri);
     free(resource_uri);
 
-    char *string_to_sign = malloc(strlen(encoded_resource_uri) + 1 /* \n */ + 10 /* epoch time */ + 1 /* NULL */);
+    const size_t len_string_to_sign = snprintf(NULL, 0, IOTHUB_SIGNATURE_STR_FORMAT,
+            encoded_resource_uri,
+            expiration
+    );
+    char *string_to_sign = malloc(len_string_to_sign + 1);
     if(!string_to_sign) {
         free(encoded_resource_uri);
         return NULL;
     }
     sprintf(string_to_sign, IOTHUB_SIGNATURE_STR_FORMAT,
             encoded_resource_uri,
-            (unsigned long int) expiration
+            expiration
     );
 
 

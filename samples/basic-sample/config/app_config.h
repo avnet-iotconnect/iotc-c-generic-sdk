@@ -1,36 +1,37 @@
-//
-// Copyright: Avnet 2020
-// Created by Nik Markovic <nikola.markovic@avnet.com> on 6/28/21.
-//
+/* SPDX-License-Identifier: MIT
+ * Copyright (C) 2020-2024 Avnet
+ * Authors: Nikola Markovic <nikola.markovic@avnet.com> et al.
+ */
+
 #ifndef APP_CONFIG_H
 #define APP_CONFIG_H
 
 #include "iotconnect.h"
 
-#define IOTCONNECT_CPID "your-cpid"
-#define IOTCONNECT_ENV  "your-enviroment"
+// from iotconnect.h IotConnectConnectionType
+#define IOTCONNECT_CONNECTION_TYPE IOTC_CT_AWS
 
-// Device Unique ID
-// If using TPM, and this value is a blank string, Registration ID will be used from output of tpm_device_provision. Otherwise, the provide Device Uinque ID will be used.
+#define IOTCONNECT_CPID "your-cpid"
+#define IOTCONNECT_ENV  "your-environment"
 #define IOTCONNECT_DUID "your-device-unique-id"
 
 // from iotconnect.h IotConnectAuthType
-#define IOTCONNECT_AUTH_TYPE IOTC_AT_SYMMETRIC_KEY
+#define IOTCONNECT_AUTH_TYPE IOTC_AT_X509
 
 // if using Symmetric Key based authentication, provide the primary or secondary key here:
 #define IOTCONNECT_SYMMETRIC_KEY ""
 
-// If using TPM, provide the Scope ID here:
-#define IOTCONNECT_SCOPE_ID ""// AKA ID Scope.
+// The server CA Certificate used to validate the Azure IoTHub or AWS IoT Core TLS Connection
+// and it is required for all authentication types:
+// #define IOTCONNECT_MQTT_SERVER_CA_CERT
+// or use else we will use defaults below...:
+// default AWS cert for RSA cert/key. Use CA3 or others where appropriate:
+#define IOTCONNECT_MQTT_SERVER_CA_CERT_DEFAULT_AWS "../../../lib/iotc-c-lib/tools/server-ca-cert-files/AmazonRootCA1.pem"
+// default Azure cert if using IOTC_CT_AZURE
+#define IOTCONNECT_MQTT_SERVER_CA_CERT_DEFAULT_AZURE "../../../lib/iotc-c-lib/tools/server-ca-cert-files/DigiCertGlobalRootG2.pem"
 
-#define IOTCONNECT_CERT_PATH "../certs"
-
-// This is the CA Certificate used to validate the IoTHub TLS Connection and it is required for all authentication types.
-// Alternatively, you can point this file to /etc/ssl/certs/Baltimore_CyberTrust_Root.pem on some Linux systems
-#define IOTCONNECT_SERVER_CERT (IOTCONNECT_CERT_PATH "/server.pem")
-
-// if IOTC_X509 is used:
-#define IOTCONNECT_IDENTITY_CERT (IOTCONNECT_CERT_PATH "/client-crt.pem")
-#define IOTCONNECT_IDENTITY_KEY (IOTCONNECT_CERT_PATH "/client-key.pem")
+// if IOTC_X509 is used reference your device identity cert and private key here
+#define IOTCONNECT_DEVICE_CERT ("../identity/client-crt.pem")
+#define IOTCONNECT_DEVICE_PRIVATE_KEY ("../identity/client-key.pem")
 
 #endif //APP_CONFIG_H

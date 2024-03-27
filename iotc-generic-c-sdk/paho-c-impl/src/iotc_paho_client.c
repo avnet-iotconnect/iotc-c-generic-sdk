@@ -1,6 +1,14 @@
+/* SPDX-License-Identifier: MIT
+ * Copyright (C) 2020-2024 Avnet
+ * Authors: Nikola Markovic <nikola.markovic@avnet.com> et al.
+ */
+
 #include <stdlib.h>
 #include <string.h>
 #include "MQTTClient.h"
+#include "iotc_log.h"
+#include "iotc_algorithms.h"
+#include "iotconnect.h"
 #include "iotc_device_client.h"
 
 #define HOST_URL_FORMAT "ssl://%s:8883"
@@ -11,24 +19,24 @@
 
 static bool is_initialized = false;
 static MQTTClient client = NULL;
-static char *publish_topic;
 static IotConnectC2dCallback c2d_msg_cb = NULL; // callback for inbound messages
-static IotConnectStatusCallback status_cb = NULL; // callback for connection status
+static IotConnectMqttStatusCallback status_cb = NULL; // callback for connection status
 
 static void paho_deinit(void) {
     if (client) {
         MQTTClient_destroy(&client);
         client = NULL;
     }
-    free(publish_topic);
-    publish_topic = NULL;
     c2d_msg_cb = NULL;
     status_cb = NULL;
 }
 
 static int on_c2d_message(void *context, char *topicName, int topicLen, MQTTClient_message *message) {
+    (void) context;
+    (void) topicLen;
+
     if (c2d_msg_cb) {
-        c2d_msg_cb(message->payload, message->payloadlen);
+        c2d_msg_cb(message->payload, (size_t) message->payloadlen);
     }
     MQTTClient_freeMessage(&message);
     MQTTClient_free(topicName);
@@ -36,7 +44,9 @@ static int on_c2d_message(void *context, char *topicName, int topicLen, MQTTClie
 }
 
 static void on_connection_lost(void *context, char *cause) {
-    printf("MQTT Connection lost. Cause: %s\n", cause);
+    (void) context;
+
+    IOTC_INFO("MQTT Connection lost. Cause: %s", cause);
 
     if (status_cb) {
         status_cb(IOTC_CS_MQTT_DISCONNECTED);
@@ -48,14 +58,10 @@ int iotc_device_client_disconnect(void) {
     int rc;
     is_initialized = false;
     if ((rc = MQTTClient_disconnect(client, 10000)) != MQTTCLIENT_SUCCESS) {
-        fprintf(stderr,"Failed to disconnect, return code %d\n", rc);
+        IOTC_ERROR("Failed to disconnect, return code %d", rc);
     }
     paho_deinit();
     return rc;
-}
-
-void iotc_device_client_receive(void) {
-    ; // do nothing for paho
 }
 
 bool iotc_device_client_is_connected(void) {
@@ -65,7 +71,7 @@ bool iotc_device_client_is_connected(void) {
     return MQTTClient_isConnected(client);
 }
 
-int iotc_device_client_send_message_qos(const char *message, int qos) {
+int iotc_device_client_send_message_qos(const char* topic, const char *message, int qos) {
     MQTTClient_message pubmsg = MQTTClient_message_initializer;
     MQTTClient_deliveryToken token;
     int rc;
@@ -73,50 +79,58 @@ int iotc_device_client_send_message_qos(const char *message, int qos) {
     pubmsg.payloadlen = (int) strlen(message);
     pubmsg.qos = qos;
     pubmsg.retained = 0;
-    if ((rc = MQTTClient_publishMessage(client, publish_topic, &pubmsg, &token)) != MQTTCLIENT_SUCCESS) {
-        fprintf(stderr,"Failed to publish message, return code %d\n", rc);
+    if ((rc = MQTTClient_publishMessage(client, topic, &pubmsg, &token)) != MQTTCLIENT_SUCCESS) {
+        IOTC_ERROR("Failed to publish message, return code %d", rc);
         return rc;
     }
 
     rc = MQTTClient_waitForCompletion(client, token, MQTT_PUBLISH_TIMEOUT_MS);
-    //printf("Message with delivery token %d delivered\n", token);
+    if (status_cb) {
+        if (0 == rc) {
+            status_cb(IOTC_CS_MQTT_DELIVERED);
+        } else {
+            status_cb(IOTC_CS_MQTT_SEND_FAILED);
+        }
+    }
+    //IOTC_INFO("Message with delivery token %d delivered", token);
     return rc;
 }
 
-int iotc_device_client_send_message(const char *message) {
-    return iotc_device_client_send_message_qos(message, 1);
+int iotc_device_client_send_message(const char* topic, const char *message) {
+    return iotc_device_client_send_message_qos(topic, message, 1);
 }
 
-int iotc_device_client_init(IotConnectDeviceClientConfig *c) {
+int iotc_device_client_connect(IotConnectDeviceClientConfig *c) {
     MQTTClient_connectOptions conn_opts = MQTTClient_connectOptions_initializer;
     MQTTClient_SSLOptions ssl_opts = MQTTClient_SSLOptions_initializer;
+    char * password = NULL;
     int rc;
+
+    IotclMqttConfig *mc = iotcl_mqtt_get_config();
+    if (!mc) {
+        return IOTCL_ERR_CONFIG_MISSING; // caled function will print the error
+    }
+
 
     paho_deinit(); // reset all locals
 
-    publish_topic = strdup(c->sr->broker.pub_topic);
-    if (!publish_topic) {
-        fprintf(stderr, "ERROR: Unable to allocate memory for paho host URL!");
-        return -1;
-    }
-
-    char *paho_host_url = malloc(sizeof(HOST_URL_FORMAT) - 2 + strlen(c->sr->broker.host));
+    char *paho_host_url = malloc((size_t) snprintf(NULL, 0, HOST_URL_FORMAT, mc->host) + 1);
     if (NULL == paho_host_url) {
-        fprintf(stderr,"ERROR: Unable to allocate memory for paho host URL!");
+        IOTC_ERROR("ERROR: Unable to allocate memory for paho host URL!");
         return -1;
     }
-    sprintf(paho_host_url, HOST_URL_FORMAT, c->sr->broker.host);
+    sprintf(paho_host_url, HOST_URL_FORMAT, mc->host);
 
-    if ((rc = MQTTClient_create(&client, paho_host_url, c->sr->broker.client_id,
+    if ((rc = MQTTClient_create(&client, paho_host_url, mc->client_id,
                                 MQTTCLIENT_PERSISTENCE_NONE, NULL)) != MQTTCLIENT_SUCCESS) {
-        printf("Failed to create client, return code %d\n", rc);
+        IOTC_ERROR("Failed to create client, return code %d", rc);
         free(paho_host_url);
         return rc;
     }
     free(paho_host_url);
 
     if ((rc = MQTTClient_setCallbacks(client, NULL, on_connection_lost, on_c2d_message, NULL)) != MQTTCLIENT_SUCCESS) {
-        fprintf(stderr,"Failed to set callbacks, return code %d\n", rc);
+        IOTC_ERROR("Failed to set callbacks, return code %d", rc);
         paho_deinit();
         return rc;
     }
@@ -126,23 +140,44 @@ int iotc_device_client_init(IotConnectDeviceClientConfig *c) {
     if (c->auth->type == IOTC_AT_X509) {
         ssl_opts.keyStore = c->auth->data.cert_info.device_cert;
         ssl_opts.privateKey = c->auth->data.cert_info.device_key;
+    } else if (c->auth->type  == IOTC_AT_SYMMETRIC_KEY) {
+        if (c->auth->data.symmetric_key && strlen(c->auth->data.symmetric_key) > 0) {
+            // for paho we need to pass the generated sas token
+            char *sas_token = gen_sas_token(mc->host,
+                                            mc->client_id,
+                                            c->auth->data.symmetric_key,
+                                            60
+            );
+            if (!sas_token) {
+                IOTC_ERROR("Unable to generate SAS token!");
+                return IOTCL_ERR_FAILED; // could be OOM or a different reason
+            }
+            // a bit of a hack - the token will be freed when freeing the sync response
+            // paho will use the SAS token as the broker password
+            password = sas_token;
+        } else {
+            IOTC_ERROR("Error: Configuration symmetric key is missing.");
+            return -1;
+        }
     }
     conn_opts.ssl = &ssl_opts;
 
     status_cb = c->status_cb;
-    conn_opts.username = c->sr->broker.user_name;
-    conn_opts.password = c->sr->broker.pass;
+    conn_opts.username = iotcl_mqtt_get_config()->username;
+    conn_opts.password = password;
     if ((rc = MQTTClient_connect(client, &conn_opts)) != MQTTCLIENT_SUCCESS) {
-        printf("Failed to connect, return code %d\n", rc);
+        IOTC_ERROR("Failed to connect, return code %d", rc);
         paho_deinit();
+        free(password);
         return rc;
     }
+    free(password);
 
     is_initialized = true; // even if we fail below, we are ok
 
-    if ((rc = MQTTClient_subscribe(client, c->sr->broker.sub_topic, 1)) != MQTTCLIENT_SUCCESS) {
-        printf("Failed to subscribe to c2d topic, return code %d\n", rc);
-        rc = -2;
+    if ((rc = MQTTClient_subscribe(client, mc->sub_c2d, 1)) != MQTTCLIENT_SUCCESS) {
+        IOTC_ERROR("Failed to subscribe to c2d topic, return code %d", rc);
+        rc = IOTCL_ERR_FAILED;
     }
     c2d_msg_cb = c->c2d_msg_cb;
 
@@ -150,11 +185,8 @@ int iotc_device_client_init(IotConnectDeviceClientConfig *c) {
         status_cb(IOTC_CS_MQTT_CONNECTED);
     }
 
-    return rc;
+    return IOTCL_SUCCESS;
 }
 
-// not supported for PAHO
-char* iotc_device_client_get_tpm_registration_id(void) {
-    return NULL;
-}
+
 

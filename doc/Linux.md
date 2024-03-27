@@ -28,34 +28,9 @@ cmake --build . --target basic-sample
 ./basic-sample
 ```
 
-* If you wish to build with the Paho MQTT client, append ```-DIOTC_USE_PAHO=ON``` to the ```cmake ..``` command line.
-
 #### Building and Running with CLion
 
-* In CLion, open the *basic-sample* project from the *samples* directory of this repo
+* In CLion, open the *basic-sample* CMakeLists project from the *samples* directory of this repo
+* You may want to point the proejct root to the root of this repo.
 * In the top right of of the IDE next to the hammer icon, select *basic-sample*
-* If you wish to build with the Paho MQTT client instead of Azure SDK, Select File->Settings->Build,Execution,Deployment->CMake 
-and enter ```-DIOTC_USE_PAHO=ON``` in the "CMake options" entry box.
 * Click the build, execute or debug icon.
-
-#### Running on SmartEdge IIoT Gateway
-
-The cmake building steps can be run on the gateway and do not require any addtional build tools or libraries to be installed.
-
-The gateway requires a fix to openssl. If ```openssl version -d``` returns **OPENSSLDIR: "/usr/local/ssl"**, execute these steps before running the sample:
-
-```shell script
-sudo rmdir  /usr/local/ssl/certs
-sudo ln -sf /etc/ssl/certs /usr/local/ssl/.
-```
-
-If you have configured your gateway using the phone app or you are using the pre-installed IoTConnect app, 
-you should also disable it  using the commands below.
-A device can have only one connection to IoTConnect.
-
-```shell script
-sudo systemctl disable iotconnectservice.service
-sudo systemctl stop iotconnectservice.service
-```
-
-It is recommended to use TPM authentication on the gateway, so configure app_config.h accordingly. 
