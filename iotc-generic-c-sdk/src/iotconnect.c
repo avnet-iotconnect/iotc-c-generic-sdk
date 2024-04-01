@@ -241,7 +241,6 @@ int iotconnect_sdk_init(IotConnectClientConfig *c) {
     } else {
         status = iotcl_init(&iotcl_cfg);
     }
-    status = iotcl_init_and_print_config(&iotcl_cfg);
     if (status) {
         iotconnect_sdk_deinit();
         return status; // called function will print errors
