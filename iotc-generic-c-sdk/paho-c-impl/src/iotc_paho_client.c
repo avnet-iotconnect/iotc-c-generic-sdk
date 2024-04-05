@@ -21,6 +21,7 @@ static bool is_initialized = false;
 static MQTTClient client = NULL;
 static IotConnectC2dCallback c2d_msg_cb = NULL; // callback for inbound messages
 static IotConnectMqttStatusCallback status_cb = NULL; // callback for connection status
+static bool is_in_async_callback = false;
 
 static void paho_deinit(void) {
     if (client) {
@@ -36,7 +37,9 @@ static int on_c2d_message(void *context, char *topicName, int topicLen, MQTTClie
     (void) topicLen;
 
     if (c2d_msg_cb) {
+        is_in_async_callback = true;
         c2d_msg_cb(message->payload, (size_t) message->payloadlen);
+        is_in_async_callback = false;
     }
     MQTTClient_freeMessage(&message);
     MQTTClient_free(topicName);
@@ -77,7 +80,14 @@ int iotc_device_client_send_message_qos(const char* topic, const char *message, 
     int rc;
     pubmsg.payload = (void *) message;
     pubmsg.payloadlen = (int) strlen(message);
-    pubmsg.qos = qos;
+    if (is_in_async_callback) {
+        // TODO: If we send messages while in async callback with QOS1,
+        // message sending hangs and says that sending has failed, but it actually succeeds on the back end
+        // We may need to be queueing messages or use the "synchronous" paho mode with polling.
+        pubmsg.qos = 0;
+    } else {
+        pubmsg.qos = qos;
+    }
     pubmsg.retained = 0;
     if ((rc = MQTTClient_publishMessage(client, topic, &pubmsg, &token)) != MQTTCLIENT_SUCCESS) {
         IOTC_ERROR("Failed to publish message, return code %d", rc);
