@@ -13,6 +13,10 @@
 #include <string.h>
 #include <ctype.h>
 
+#include "iotconnect.h"
+#include "iotc_algorithms.h"
+#include "iotc_log.h"
+
 #if IOTCONNECT_USE_CUSTOM_ALGORITHMS
 
 #ifndef IOTHUB_RESOURCE_URI_FORMAT
@@ -365,16 +369,16 @@ static char *uri_encode(const char *uri) {
     return outbuff;
 }
 
-char *gen_sas_token(const char *host, const char *client_id, const char *b64key, unsigned long expiry_secs) {
+char *gen_sas_token(const char *host, const char *client_id, const char *b64key, time_t expiry_secs) {
     // example: SharedAccessSignature sr=poc-iotconnect-iothub-eu.azure-devices.net%2Fdevices%2CPID-DUUID&sig=WBBsC0rhu1idLR6aWaKiMbcrBCm9jPI4st2clhVKrW4%3D&se=1656689541
     // SharedAccessSignature sr={URL-encoded-resourceURI}&sig={signature-string}&se={expiry}
     // URL-encoded-resourceURI: myHub.azure-devices.net/devices/mydevice
     // expiry: unix time of expiry of signature
     // signature-string: {URL-encoded-resourceURI} + "\n" + expiry
-    const size_t len_resource_uri = snprintf(NULL, 0, IOTHUB_RESOURCE_URI_FORMAT, client_id, host);
+    const size_t len_resource_uri = (size_t) snprintf(NULL, 0, IOTHUB_RESOURCE_URI_FORMAT, client_id, host);
 
-    unsigned long int expiration = ((unsigned long int) time(NULL)) + expiry_secs;
-    char *resource_uri = malloc(len_resource_uri);
+    unsigned long int expiration = ((unsigned long int) time(NULL)) + (unsigned long int) expiry_secs;
+    char *resource_uri = malloc(len_resource_uri + 1);
     if(!resource_uri) {
         return NULL;
     }
@@ -383,9 +387,9 @@ char *gen_sas_token(const char *host, const char *client_id, const char *b64key,
     char *encoded_resource_uri = uri_encode(resource_uri);
     free(resource_uri);
 
-    const size_t len_string_to_sign = snprintf(NULL, 0, IOTHUB_SIGNATURE_STR_FORMAT,
+    const size_t len_string_to_sign = (size_t) snprintf(NULL, 0, IOTHUB_SIGNATURE_STR_FORMAT,
             encoded_resource_uri,
-            (unsigned int) expiration
+            (unsigned long) expiration
     );
     char *string_to_sign = malloc(len_string_to_sign + 1);
     if(!string_to_sign) {
