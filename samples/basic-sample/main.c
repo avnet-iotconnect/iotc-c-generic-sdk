@@ -53,7 +53,7 @@ static void on_command(IotclC2dEventData data) {
         printf("Command %s received with %s ACK ID\n", command, ack_id ? ack_id : "no");
         // could be a command without acknowledgement, so ackID can be null
         if (ack_id) {
-            iotcl_mqtt_send_cmd_ack(ack_id, IOTCL_C2D_EVT_CMD_FAILED, "Not implemented");
+            iotcl_mqtt_send_cmd_ack(ack_id, IOTCL_C2D_EVT_CMD_SUCCESS_WITH_ACK, "Not implemented");
         }
     } else {
         // could be a command without acknowledgement, so ackID can be null
@@ -90,8 +90,7 @@ static void on_ota(IotclC2dEventData data) {
             success = false;
             message = "Not implemented";
         } else {
-            printf("Device firmware version %s is newer than OTA version %s. Sending failure\n", APP_VERSION,
-                   version);
+            printf("Device firmware version %s is newer than OTA version %s. Sending failure\n", APP_VERSION, version);
             // Not sure what to do here. The app version is better than OTA version.
             // Probably a development version, so return failure?
             // The user should decide here.
@@ -100,7 +99,7 @@ static void on_ota(IotclC2dEventData data) {
         }
     }
 
-    iotcl_mqtt_send_ota_ack(ack_id, (success ? IOTCL_C2D_EVT_OTA_SUCCESS : IOTCL_C2D_EVT_OTA_DOWNLOAD_FAILED), message);
+    iotcl_mqtt_send_ota_ack(ack_id, (success ? IOTCL_C2D_EVT_OTA_DOWNLOAD_DONE : IOTCL_C2D_EVT_OTA_DOWNLOAD_FAILED), message);
 }
 
 static void publish_telemetry() {

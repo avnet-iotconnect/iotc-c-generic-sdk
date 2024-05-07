@@ -17,7 +17,7 @@ The videos use the older protocol 1.0 support version, but most of the concepts 
 
 The project uses the following dependent projects as git submodules:
 
-* [iotc-c-lib](https://github.com/avnet-iotconnect/iotc-c-lib.git) from source TBD
+* [iotc-c-lib](https://github.com/avnet-iotconnect/iotc-c-lib.git) from source (v3.1.0-proto-2.1)
 * [cJSON](https://github.com/DaveGamble/cJSON.git) from source (as iotc-c-lib dependency)
 * [paho.mqtt.c](https://github.com/eclipse/paho.mqtt.c.git) from source - v1.3.13
 * [libcurl](https://curl.se/libcurl/) as a dynamically linked library.  
