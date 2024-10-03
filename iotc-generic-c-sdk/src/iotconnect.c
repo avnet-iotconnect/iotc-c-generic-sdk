@@ -271,7 +271,6 @@ int iotconnect_sdk_connect(void) {
     int status = iotc_device_client_connect(&dc);
     if (status) {
         IOTC_ERROR("Failed to connect!");
-        iotconnect_sdk_deinit();
         return status;
     }
     return 0;
